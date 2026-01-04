@@ -802,7 +802,7 @@ embed.add_field(
 )
 
 await ctx.send(embed=embed)
-Error handling
+#Error handling
 @bot.event
 async def on_command_error(ctx, error):
 if isinstance(error, commands.CommandNotFound):
@@ -816,13 +816,14 @@ elif isinstance(error, commands.BadArgument):
 await ctx.send("❌ Invalid argument provided.")
 else:
 await ctx.send(f"❌ An error occurred: {str(error)}")
-============================================================================
-BOT TOKEN - LOADED FROM ENVIRONMENT VARIABLES
-============================================================================
+#============================================================================
+#BOT TOKEN - LOADED FROM ENVIRONMENT VARIABLES
+#============================================================================
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
 print("ERROR: No token found! Set DISCORD_TOKEN in .env file.")
 exit(1)
-Run the bot
+#Run the bot
 if name == "main":
 bot.run(TOKEN)</parameter>
+
