@@ -717,113 +717,121 @@ class TicTacToeView(discord.ui.View):
         
         self.embed = discord.Embed(
             title="❌ Tic Tac Toe ⭕",
-        <parameter name="content"> description=f"{x_user.mention} (❌) vs {o_user.mention} (⭕)",
-color=discord.Color.blue()
-)
-self.embed.add_field(name="Current Turn", value=f"{x_user.mention} (❌)")
-# Create 3x3 grid of buttons
-    for y in range(3):
-        for x in range(3):
-            self.add_item(TicTacToeButton(x, y))
+            description=f"{x_user.mention} (❌) vs {o_user.mention} (⭕)",
+            color=discord.Color.blue()
+        )
+        self.embed.add_field(name="Current Turn", value=f"{x_user.mention} (❌)")
+        
+        # Create 3x3 grid of buttons
+        for y in range(3):
+            for x in range(3):
+                self.add_item(TicTacToeButton(x, y))
+    
+    def check_winner(self):
+        """Check if there's a winner"""
+        winning_combos = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
+            [0, 4, 8], [2, 4, 6]              # Diagonals
+        ]
+        
+        for combo in winning_combos:
+            if self.board[combo[0]] == self.board[combo[1]] == self.board[combo[2]] != ' ':
+                return self.board[combo[0]]
+        
+        if ' ' not in self.board:
+            return 'tie'
+        
+        return None
+    
+    async def on_timeout(self):
+        for child in self.children:
+            child.disabled = True
+        self.embed.add_field(name="Timeout", value="⏰ Game timed out!")
+        try:
+            await self.message.edit(embed=self.embed, view=self)
+        except:
+            pass
 
-def check_winner(self):
-    """Check if there's a winner"""
-    winning_combos = [
-        [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-        [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-        [0, 4, 8], [2, 4, 6]              # Diagonals
-    ]
-    
-    for combo in winning_combos:
-        if self.board[combo[0]] == self.board[combo[1]] == self.board[combo[2]] != ' ':
-            return self.board[combo[0]]
-    
-    if ' ' not in self.board:
-        return 'tie'
-    
-    return None
-
-async def on_timeout(self):
-    for child in self.children:
-        child.disabled = True
-    self.embed.add_field(name="Timeout", value="⏰ Game timed out!")
-    try:
-        await self.message.edit(embed=self.embed, view=self)
-    except:
-        pass
-        @bot.command(name='tictactoe')
+@bot.command(name='tictactoe')
 async def tictactoe(ctx, opponent: discord.Member):
-"""Start a tic tac toe game with another player"""
-if opponent.bot:
-await ctx.send("❌ You can't play against a bot!")
-return
-if opponent.id == ctx.author.id:
-    await ctx.send("❌ You can't play against yourself!")
-    return
+    """Start a tic tac toe game with another player"""
+    if opponent.bot:
+        await ctx.send("❌ You can't play against a bot!")
+        return
+    
+    if opponent.id == ctx.author.id:
+        await ctx.send("❌ You can't play against yourself!")
+        return
+    
+    view = TicTacToeView(ctx.author, opponent)
+    view.message = await ctx.send(embed=view.embed, view=view)
 
-view = TicTacToeView(ctx.author, opponent)
-view.message = await ctx.send(embed=view.embed, view=view)
 @bot.command(name='help')
 async def help_command(ctx):
-"""Display help information"""
-embed = discord.Embed(
-title="Test1 Bot Commands",
-description="Prefix: ,",
-color=discord.Color.blue()
-)
-embed.add_field(
-    name="🛡️ Moderation",
-    value="`ban`, `unban`, `kick`, `mute`, `unmute`, `warn`, `warnings`, `clearwarns`, `purge`, `lock`, `unlock`, `slowmode`",
-    inline=False
-)
+    """Display help information"""
+    embed = discord.Embed(
+        title="Test1 Bot Commands",
+        description="Prefix: ,",
+        color=discord.Color.blue()
+    )
+    
+    embed.add_field(
+        name="🛡️ Moderation",
+        value="`ban`, `unban`, `kick`, `mute`, `unmute`, `warn`, `warnings`, `clearwarns`, `purge`, `lock`, `unlock`, `slowmode`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="👥 Role Management",
+        value="`addrole`, `removerole`, `roleinfo`, `roles`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🔧 Utility",
+        value="`serverinfo`, `userinfo`, `avatar`, `banner`, `poll`, `announce`, `afk`, `help`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🔢 Counting Game",
+        value="`setcounting`, `removecounting`, `countingstatus`, `resetcount`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🎮 Games",
+        value="`tictactoe` - Play tic tac toe with another user",
+        inline=False
+    )
+    
+    await ctx.send(embed=embed)
 
-embed.add_field(
-    name="👥 Role Management",
-    value="`addrole`, `removerole`, `roleinfo`, `roles`",
-    inline=False
-)
-
-embed.add_field(
-    name="🔧 Utility",
-    value="`serverinfo`, `userinfo`, `avatar`, `banner`, `poll`, `announce`, `afk`, `help`",
-    inline=False
-)
-
-embed.add_field(
-    name="🔢 Counting Game",
-    value="`setcounting`, `removecounting`, `countingstatus`, `resetcount`",
-    inline=False
-)
-
-embed.add_field(
-    name="🎮 Games",
-    value="`tictactoe` - Play tic tac toe with another user",
-    inline=False
-)
-
-await ctx.send(embed=embed)
-#Error handling
+# Error handling
 @bot.event
 async def on_command_error(ctx, error):
-if isinstance(error, commands.CommandNotFound):
-# Silently ignore invalid commands
-return
-elif isinstance(error, commands.MissingPermissions):
-await ctx.send("❌ You don't have permission to use this command.")
-elif isinstance(error, commands.MissingRequiredArgument):
-await ctx.send(f"❌ Missing required argument: {error.param.name}")
-elif isinstance(error, commands.BadArgument):
-await ctx.send("❌ Invalid argument provided.")
-else:
-await ctx.send(f"❌ An error occurred: {str(error)}")
+    if isinstance(error, commands.CommandNotFound):
+        # Silently ignore invalid commands
+        return
+    elif isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command.")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing required argument: {error.param.name}")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Invalid argument provided.")
+    else:
+        await ctx.send(f"❌ An error occurred: {str(error)}")
+
 #============================================================================
-#BOT TOKEN - LOADED FROM ENVIRONMENT VARIABLES
+# BOT TOKEN - LOADED FROM ENVIRONMENT VARIABLES
 #============================================================================
+
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
-print("ERROR: No token found! Set DISCORD_TOKEN in .env file.")
-exit(1)
-#Run the bot
-if name == "main":
-bot.run(TOKEN)</parameter>
+    print("ERROR: No token found! Set DISCORD_TOKEN in .env file.")
+    exit(1)
 
+# Run the bot
+if __name__ == "__main__":
+    bot.run(TOKEN)
