@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+print(f"Token loaded: {os.getenv('DISCORD_TOKEN')[:20]}..." if os.getenv('DISCORD_TOKEN') else "Token is None!")
 
 # Bot setup
 intents = discord.Intents.all()
