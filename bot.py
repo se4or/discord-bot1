@@ -10,6 +10,14 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Debug: Print if token was loaded
+if not os.getenv('DISCORD_TOKEN'):
+    print("ERROR: DISCORD_TOKEN not found in environment variables!")
+    print(f"Current working directory: {os.getcwd()}")
+    print(f"Looking for .env file at: {os.path.join(os.getcwd(), '.env')}")
+    print(f".env file exists: {os.path.exists('.env')}")
+    exit(1)
+
 # Bot setup
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=',', intents=intents, help_command=None)
@@ -829,10 +837,15 @@ async def on_command_error(ctx, error):
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
+    print("=" * 80)
     print("ERROR: No token found! Set DISCORD_TOKEN in .env file.")
+    print(f"Current directory: {os.getcwd()}")
+    print(f"Files in directory: {os.listdir('.')}")
+    print("=" * 80)
     exit(1)
+
+print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 # Run the bot
 if __name__ == "__main__":
     bot.run(TOKEN)
-
