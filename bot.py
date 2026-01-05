@@ -433,6 +433,23 @@ async def roles(ctx, member: discord.Member = None):
     embed.set_footer(text=f"Total roles: {len(roles)}")
     await ctx.send(embed=embed)
 
+# Fun Commands
+
+@bot.command(name='cussout')
+async def cussout(ctx, member: discord.Member):
+    """Cuss out a user"""
+    cuss_message = "hey big bum motherfucker shut yo raggedy ass up u piece of shit"
+    
+    # Check if the command message is replying to another message
+    if ctx.message.reference:
+        # Get the message being replied to
+        replied_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        # Reply to that message with the cuss out
+        await replied_message.reply(f"{member.mention} {cuss_message}")
+    else:
+        # Just mention the user if not replying to a message
+        await ctx.send(f"{member.mention} {cuss_message}")
+
 # Utility Commands
 
 @bot.command(name='serverinfo')
@@ -799,6 +816,12 @@ async def help_command(ctx):
     embed.add_field(
         name="🔧 Utility",
         value="`serverinfo`, `userinfo`, `avatar`, `banner`, `poll`, `announce`, `afk`, `help`",
+        inline=False
+    )
+    
+    embed.add_field(
+        name="🎉 Fun",
+        value="`cussout` - Cuss out a user",
         inline=False
     )
     
