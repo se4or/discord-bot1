@@ -1,0 +1,22 @@
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+## **Your final folder structure should be:**
+```
+your-bot-folder/
+├── .gitignore          (NEW - don't upload .env to GitHub)
+├── bot.py              (REPLACE with the complete code above)
+├── Procfile            (NEW - tells Railway how to run bot)
+├── railway.json        (NEW - Railway configuration)
+├── requirements.txt    (you already have this)
+├── runtime.txt         (you already have this)
+└── counting_data.json  (auto-created by bot)
