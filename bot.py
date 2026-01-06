@@ -536,12 +536,22 @@ async def lexi(ctx):
         
         if gifs:
             random_gif = random.choice(gifs)
-            await ctx.reply(f"{ctx.author.mention} {random_gif}")
+            
+            # Create an embed to frame the GIF nicely
+            embed = discord.Embed(
+                title="💖 Here's your Hello Kitty! 💖",
+                color=discord.Color.pink()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+            
+            # Reply without pinging (@)
+            await ctx.reply(embed=embed, mention_author=False)
         else:
             await ctx.send(f"❌ Failed to fetch Hello Kitty GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Hello Kitty GIF: {e}")
-
+        
 def hex_to_color(hex_code):
     """Convert hex code to discord.Color"""
     hex_code = hex_code.strip('#')
@@ -1155,4 +1165,5 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
+
 
