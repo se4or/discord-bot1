@@ -29,9 +29,6 @@ warnings = {}
 muted_users = {}
 afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
 
-# Counting game storage with persistent file
-COUNTING_DATA_FILE = 'counting_data.json'
-
 # Tenor API configuration
 TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # Public Tenor API key
 TENOR_SEARCH_URL = "https://tenor.googleapis.com/v2/search"
@@ -64,28 +61,6 @@ async def fetch_hello_kitty_gifs():
         print(f"Error fetching GIFs from Tenor: {e}")
         return None
 
-def load_counting_data():
-    """Load counting data from file"""
-    try:
-        if os.path.exists(COUNTING_DATA_FILE):
-            with open(COUNTING_DATA_FILE, 'r') as f:
-                data = json.load(f)
-                return {int(k): v for k, v in data.items()}
-    except Exception as e:
-        print(f"Error loading counting data: {e}")
-    return {}
-
-def save_counting_data():
-    """Save counting data to file"""
-    try:
-        with open(COUNTING_DATA_FILE, 'w') as f:
-            json.dump(counting_channels, f, indent=4)
-    except Exception as e:
-        print(f"Error saving counting data: {e}")
-
-# Load counting channels from file on startup
-counting_channels = load_counting_data()
-
 # Track command processing with a SHORT delay
 processing_lock = set()
 
@@ -94,11 +69,6 @@ async def on_ready():
     instance_id = os.getpid()
     print(f'{bot.user} is online! [PID: {instance_id}]')
     print(f'Bot ID: {bot.user.id}')
-    print(f'Loaded {len(counting_channels)} counting channels from storage')
-    if counting_channels:
-        print(f'Counting channel IDs: {list(counting_channels.keys())}')
-        for channel_id, data in counting_channels.items():
-            print(f'  Channel {channel_id}: count={data.get("count")}, highest={data.get("highest_count")}')
     try:
         synced = await bot.tree.sync()
         print(f'Synced {len(synced)} commands [PID: {instance_id}]')
@@ -123,62 +93,6 @@ async def on_message(message):
                 f"💤 {mentioned_user.mention} is currently AFK: {afk_data['reason']}",
                 delete_after=5
             )
-    
-    # Check if this is a counting channel
-    if message.channel.id in counting_channels:
-        game = counting_channels[message.channel.id]
-        
-        try:
-            number = int(message.content.strip())
-            
-            if game['count'] == 0 and number != 1:
-                await message.delete()
-                fail_msg = await message.channel.send(f"{message.author.mention} bruh we at 0, start from 1 dumbass")
-                await asyncio.sleep(5)
-                await fail_msg.delete()
-                return
-            
-            if message.author.id == game['last_user']:
-                await message.delete()
-                fail_msg = await message.channel.send(f"{message.author.mention} calm down Einstein you know how to count we get it cant count twice in a row bro")
-                await asyncio.sleep(5)
-                await fail_msg.delete()
-                game['count'] = 0
-                game['last_user'] = None
-                game['fails'] = game.get('fails', 0) + 1
-                save_counting_data()
-                return
-            
-            if number == game['count'] + 1:
-                game['count'] = number
-                game['last_user'] = message.author.id
-                game['total_counts'] = game.get('total_counts', 0) + 1
-                
-                if number > game.get('highest_count', 0):
-                    game['highest_count'] = number
-                
-                save_counting_data()
-                await message.add_reaction('✅')
-                
-                if number in [10, 50, 100, 500, 1000, 5000, 10000]:
-                    milestone_msg = await message.channel.send(f"🎉 **MILESTONE REACHED!** The count is now at **{number}**! 🎉")
-                    await asyncio.sleep(10)
-                    try:
-                        await milestone_msg.delete()
-                    except:
-                        pass
-            else:
-                await message.delete()
-                expected = game['count'] + 1
-                fail_msg = await message.channel.send(f"{message.author.mention} at your big age still cant count smfh (expected {expected}, got {number}. Count restarted to 1)")
-                await asyncio.sleep(5)
-                await fail_msg.delete()
-                game['count'] = 0
-                game['last_user'] = None
-                game['fails'] = game.get('fails', 0) + 1
-                save_counting_data()
-        except ValueError:
-            pass
     
     if not message.content.startswith(','):
         return
@@ -550,7 +464,7 @@ async def lexi(ctx):
             await ctx.send(f"❌ Failed to fetch Hello Kitty GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Hello Kitty GIF: {e}")
-        
+
 def hex_to_color(hex_code):
     """Convert hex code to discord.Color"""
     hex_code = hex_code.strip('#')
@@ -824,108 +738,6 @@ async def afk(ctx, *, reason="AFK"):
     embed.add_field(name="Reason", value=reason)
     await ctx.reply(embed=embed)
 
-# ==================== Counting Game ====================
-
-@bot.command(name='setcounting')
-@commands.has_permissions(manage_channels=True)
-async def setcounting(ctx):
-    """Set the current channel as a counting channel"""
-    if ctx.channel.id in counting_channels:
-        await ctx.send("❌ This channel is already a counting channel! Use `,countingstatus` to see the current count.")
-        return
-    
-    counting_channels[ctx.channel.id] = {
-        'count': 0,
-        'last_user': None,
-        'total_counts': 0,
-        'highest_count': 0,
-        'fails': 0
-    }
-    save_counting_data()
-    
-    embed = discord.Embed(
-        title="🔢 Counting Game Started!",
-        description=f"{ctx.channel.mention} is now a counting channel!",
-        color=discord.Color.green()
-    )
-    embed.add_field(name="Rules", value="• Start counting from 1\n• Each person can only count once in a row\n• Count sequentially (1, 2, 3...)\n• If you mess up, count resets to 1\n• After a reset, the next number MUST be 1", inline=False)
-    embed.add_field(name="Start", value="Someone type `1` to begin!", inline=False)
-    embed.set_footer(text="📊 Stats are being tracked! Use ,countingstatus to view")
-    await ctx.send(embed=embed)
-
-@bot.command(name='removecounting')
-@commands.has_permissions(manage_channels=True)
-async def removecounting(ctx):
-    """Remove counting game from the current channel"""
-    if ctx.channel.id in counting_channels:
-        game = counting_channels[ctx.channel.id]
-        embed = discord.Embed(
-            title="🔢 Counting Game Removed",
-            description="Final Statistics",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Highest Count Reached", value=str(game.get('highest_count', 0)), inline=True)
-        embed.add_field(name="Total Numbers Counted", value=str(game.get('total_counts', 0)), inline=True)
-        embed.add_field(name="Total Fails", value=str(game.get('fails', 0)), inline=True)
-        
-        del counting_channels[ctx.channel.id]
-        save_counting_data()
-        await ctx.send(embed=embed)
-    else:
-        await ctx.send("❌ This channel is not a counting channel.")
-
-@bot.command(name='countingstatus')
-async def countingstatus(ctx):
-    """Check the current count in this channel"""
-    if ctx.channel.id in counting_channels:
-        game = counting_channels[ctx.channel.id]
-        embed = discord.Embed(
-            title="🔢 Counting Status",
-            description=f"Current count: **{game['count']}**",
-            color=discord.Color.blue()
-        )
-        if game['last_user']:
-            try:
-                last_user = await bot.fetch_user(game['last_user'])
-                embed.add_field(name="Last Counter", value=last_user.mention, inline=True)
-            except:
-                embed.add_field(name="Last Counter", value="Unknown User", inline=True)
-        
-        embed.add_field(name="Next Number", value=str(game['count'] + 1), inline=True)
-        embed.add_field(name="Highest Count", value=str(game.get('highest_count', 0)), inline=True)
-        embed.add_field(name="Total Counts", value=str(game.get('total_counts', 0)), inline=True)
-        embed.add_field(name="Total Fails", value=str(game.get('fails', 0)), inline=True)
-        
-        total = game.get('total_counts', 0) + game.get('fails', 0)
-        if total > 0:
-            success_rate = (game.get('total_counts', 0) / total) * 100
-            embed.add_field(name="Success Rate", value=f"{success_rate:.1f}%", inline=True)
-        
-        await ctx.send(embed=embed)
-    else:
-        await ctx.send("❌ This channel is not a counting channel. Use `,setcounting` to start!")
-
-@bot.command(name='resetcount')
-@commands.has_permissions(manage_messages=True)
-async def resetcount(ctx):
-    """Reset the count in this channel"""
-    if ctx.channel.id in counting_channels:
-        old_count = counting_channels[ctx.channel.id]['count']
-        counting_channels[ctx.channel.id]['count'] = 0
-        counting_channels[ctx.channel.id]['last_user'] = None
-        save_counting_data()
-        
-        embed = discord.Embed(
-            title="🔢 Count Manually Reset",
-            description=f"Count has been reset from {old_count} to 0!",
-            color=discord.Color.orange()
-        )
-        embed.add_field(name="Next Number", value="1")
-        embed.set_footer(text=f"Reset by {ctx.author}")
-        await ctx.send(embed=embed)
-    else:
-        await ctx.send("❌ This channel is not a counting channel.")
-
 # ==================== Tic Tac Toe ====================
 
 class TicTacToeButton(discord.ui.Button):
@@ -1118,18 +930,6 @@ async def help_command(ctx):
         inline=False
     )
     
-    # Counting Game
-    embed.add_field(
-        name="🔢 Counting Game",
-        value=(
-            "`setcounting` - Enable counting in channel\n"
-            "`removecounting` - Disable counting\n"
-            "`countingstatus` - View counting stats\n"
-            "`resetcount` - Reset the count"
-        ),
-        inline=False
-    )
-    
     embed.set_footer(text="Made with 💖 | Use ,help to see this menu again")
     
     await ctx.send(embed=embed)
@@ -1164,6 +964,3 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
-
-
-
