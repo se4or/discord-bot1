@@ -61,6 +61,10 @@ async def on_ready():
     print(f'{bot.user} is online! [PID: {instance_id}]')
     print(f'Bot ID: {bot.user.id}')
     print(f'Loaded {len(counting_channels)} counting channels from storage')
+    if counting_channels:
+        print(f'Counting channel IDs: {list(counting_channels.keys())}')
+        for channel_id, data in counting_channels.items():
+            print(f'  Channel {channel_id}: count={data.get("count")}, highest={data.get("highest_count")}')
     try:
         synced = await bot.tree.sync()
         print(f'Synced {len(synced)} commands [PID: {instance_id}]')
