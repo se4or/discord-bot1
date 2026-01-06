@@ -1044,16 +1044,84 @@ async def tictactoe(ctx, opponent: discord.Member):
 async def help_command(ctx):
     """Display help information"""
     embed = discord.Embed(
-        title="Test1 Bot Commands",
-        description="Prefix: ,",
+        title="🤖 Test1 Bot Commands",
+        description="Prefix: `,`\nUse `,command` to run a command",
         color=discord.Color.blue()
     )
     
+    # Moderation Commands
     embed.add_field(
-        name="🎉 Fun",
-        value="`lexi` - Send a random Hello Kitty GIF",
+        name="⚖️ Moderation",
+        value=(
+            "`ban @user [reason]` - Ban a member\n"
+            "`unban <user_id> [reason]` - Unban a user\n"
+            "`kick @user [reason]` - Kick a member\n"
+            "`mute @user [duration] [reason]` - Mute a member\n"
+            "`unmute @user` - Unmute a member\n"
+            "`warn @user [reason]` - Warn a member\n"
+            "`warnings @user` - View warnings\n"
+            "`clearwarns @user` - Clear warnings\n"
+            "`purge <amount>` - Delete messages\n"
+            "`lock` - Lock channel\n"
+            "`unlock` - Unlock channel\n"
+            "`slowmode <seconds>` - Set slowmode"
+        ),
         inline=False
     )
+    
+    # Role Management
+    embed.add_field(
+        name="👑 Role Management",
+        value=(
+            "`addrole @user @role` - Give a role\n"
+            "`removerole @user @role` - Remove a role\n"
+            "`roleinfo @role` - Role information\n"
+            "`roles [@user]` - List user's roles"
+        ),
+        inline=False
+    )
+    
+    # Fun Commands
+    embed.add_field(
+        name="🎉 Fun",
+        value=(
+            "`lexi` - Random Hello Kitty GIF\n"
+            "`rolecolor` - Create custom colored role\n"
+            "`gradientrole` - Create gradient colored role\n"
+            "`tictactoe @user` - Play tic-tac-toe\n"
+            "`cussout @user` - Cuss out user (owner only)"
+        ),
+        inline=False
+    )
+    
+    # Utility Commands
+    embed.add_field(
+        name="🔧 Utility",
+        value=(
+            "`serverinfo` - Server information\n"
+            "`userinfo [@user]` - User information\n"
+            "`avatar [@user]` - Show avatar\n"
+            "`banner [@user]` - Show banner\n"
+            "`poll \"question\" \"opt1\" \"opt2\"` - Create poll\n"
+            "`announce #channel <message>` - Send announcement\n"
+            "`afk [reason]` - Set AFK status"
+        ),
+        inline=False
+    )
+    
+    # Counting Game
+    embed.add_field(
+        name="🔢 Counting Game",
+        value=(
+            "`setcounting` - Enable counting in channel\n"
+            "`removecounting` - Disable counting\n"
+            "`countingstatus` - View counting stats\n"
+            "`resetcount` - Reset the count"
+        ),
+        inline=False
+    )
+    
+    embed.set_footer(text="Made with 💖 | Use ,help to see this menu again")
     
     await ctx.send(embed=embed)
 
@@ -1087,3 +1155,4 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
+
