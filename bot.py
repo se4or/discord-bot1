@@ -27,10 +27,32 @@ warnings = {}
 muted_users = {}
 afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
 
-# Counting game storage
-counting_channels = {}  # {channel_id: {'count': 0, 'last_user': None}}
+# Counting game storage with persistent file
+COUNTING_DATA_FILE = 'counting_data.json'
 
-# CRITICAL: Track command processing with a SHORT delay
+def load_counting_data():
+    """Load counting data from file"""
+    try:
+        if os.path.exists(COUNTING_DATA_FILE):
+            with open(COUNTING_DATA_FILE, 'r') as f:
+                data = json.load(f)
+                return {int(k): v for k, v in data.items()}
+    except Exception as e:
+        print(f"Error loading counting data: {e}")
+    return {}
+
+def save_counting_data():
+    """Save counting data to file"""
+    try:
+        with open(COUNTING_DATA_FILE, 'w') as f:
+            json.dump(counting_channels, f, indent=4)
+    except Exception as e:
+        print(f"Error saving counting data: {e}")
+
+# Load counting channels from file on startup
+counting_channels = load_counting_data()
+
+# Track command processing with a SHORT delay
 processing_lock = set()
 
 @bot.event
@@ -38,6 +60,7 @@ async def on_ready():
     instance_id = os.getpid()
     print(f'{bot.user} is online! [PID: {instance_id}]')
     print(f'Bot ID: {bot.user.id}')
+    print(f'Loaded {len(counting_channels)} counting channels from storage')
     try:
         synced = await bot.tree.sync()
         print(f'Synced {len(synced)} commands [PID: {instance_id}]')
@@ -47,9 +70,17 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     """Custom message handler to prevent duplicate processing"""
-    # Ignore bot messages
     if message.author.bot:
         return
+    
+    # Check for AFK users in mentions
+    for mentioned_user in message.mentions:
+        if mentioned_user.id in afk_users:
+            afk_data = afk_users[mentioned_user.id]
+            await message.reply(
+                f"💤 {mentioned_user.mention} is currently AFK: {afk_data['reason']}",
+                delete_after=5
+            )
     
     # Check if this is a counting channel
     if message.channel.id in counting_channels:
@@ -58,55 +89,70 @@ async def on_message(message):
         try:
             number = int(message.content.strip())
             
-            # Check if same user is trying to count twice in a row
-            if message.author.id == game['last_user']:
+            if game['count'] == 0 and number != 1:
                 await message.delete()
-                fail_msg = await message.channel.send(f"{message.author.mention} at your big age still cant count smfh (can't count twice in a row, restarted to 1)")
+                fail_msg = await message.channel.send(f"{message.author.mention} bruh we at 0, start from 1 dumbass")
                 await asyncio.sleep(5)
                 await fail_msg.delete()
-                # Reset count to start from 1 again
-                game['count'] = 0
-                game['last_user'] = None
                 return
             
-            # Check if it's the correct number
+            if message.author.id == game['last_user']:
+                await message.delete()
+                fail_msg = await message.channel.send(f"{message.author.mention} calm down Einstein you know how to count we get it cant count twice in a row bro")
+                await asyncio.sleep(5)
+                await fail_msg.delete()
+                game['count'] = 0
+                game['last_user'] = None
+                game['fails'] = game.get('fails', 0) + 1
+                save_counting_data()
+                return
+            
             if number == game['count'] + 1:
                 game['count'] = number
                 game['last_user'] = message.author.id
+                game['total_counts'] = game.get('total_counts', 0) + 1
+                
+                if number > game.get('highest_count', 0):
+                    game['highest_count'] = number
+                
+                save_counting_data()
                 await message.add_reaction('✅')
+                
+                if number in [10, 50, 100, 500, 1000, 5000, 10000]:
+                    milestone_msg = await message.channel.send(f"🎉 **MILESTONE REACHED!** The count is now at **{number}**! 🎉")
+                    await asyncio.sleep(10)
+                    try:
+                        await milestone_msg.delete()
+                    except:
+                        pass
             else:
                 await message.delete()
-                fail_msg = await message.channel.send(f"{message.author.mention} at your big age still cant count smfh (wrong number, count restarted to 1)")
+                expected = game['count'] + 1
+                fail_msg = await message.channel.send(f"{message.author.mention} at your big age still cant count smfh (expected {expected}, got {number}. Count restarted to 1)")
                 await asyncio.sleep(5)
                 await fail_msg.delete()
-                # Reset count to start from 1 again
                 game['count'] = 0
                 game['last_user'] = None
+                game['fails'] = game.get('fails', 0) + 1
+                save_counting_data()
         except ValueError:
-            # Not a number, ignore it for counting game but still process commands
             pass
     
-    # Only process messages that start with our prefix
     if not message.content.startswith(','):
         return
     
-    # Create unique key for this command
     command_key = f"{message.id}"
     
-    # Check if this command is already being processed
     if command_key in processing_lock:
         print(f"[DUPLICATE BLOCKED] Message {message.id} is already being processed")
         return
     
-    # Add to processing lock IMMEDIATELY
     processing_lock.add(command_key)
     print(f"[PROCESSING] Message {message.id} - Lock acquired")
     
     try:
-        # Process the command
         await bot.process_commands(message)
     finally:
-        # Remove from lock after 3 seconds
         await asyncio.sleep(3)
         processing_lock.discard(command_key)
         print(f"[RELEASED] Message {message.id} - Lock released")
@@ -116,11 +162,9 @@ async def before_any_command(ctx):
     """This runs before every command"""
     print(f"[BEFORE_INVOKE] Command: {ctx.command.name} | User: {ctx.author} | Message ID: {ctx.message.id}")
     
-    # Check if user is returning from AFK when they run a command
     if ctx.author.id in afk_users:
         afk_data = afk_users[ctx.author.id]
         try:
-            # Remove [AFK] from nickname
             if ctx.author.nick and ctx.author.nick.startswith('[AFK] '):
                 original_nick = afk_data.get('original_nick')
                 await ctx.author.edit(nick=original_nick)
@@ -140,7 +184,7 @@ async def after_any_command(ctx):
     """This runs after every command"""
     print(f"[AFTER_INVOKE] Command: {ctx.command.name} | User: {ctx.author} | Message ID: {ctx.message.id}")
 
-# Moderation Commands
+# ==================== Moderation Commands ====================
 
 @bot.command(name='ban')
 @commands.has_permissions(ban_members=True)
@@ -166,7 +210,7 @@ async def unban(ctx, user_id: int, *, reason="No reason provided"):
     try:
         user = await bot.fetch_user(user_id)
         await ctx.guild.unban(user, reason=reason)
-        await ctx.send(f"Unbanned {user.name}#{user.discriminator}")
+        await ctx.send(f"Unbanned {user.name}")
     except Exception as e:
         await ctx.send(f"Failed to unban user: {e}")
 
@@ -190,9 +234,8 @@ async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
 @bot.command(name='mute')
 @commands.has_permissions(moderate_members=True)
 async def mute(ctx, member: discord.Member, duration: str = None, *, reason="No reason provided"):
-    """Mute a member (e.g., ?mute @user 10m reason)"""
+    """Mute a member (e.g., ,mute @user 10m reason)"""
     try:
-        # Parse duration
         time_dict = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
         if duration:
             time_value = int(duration[:-1])
@@ -303,19 +346,10 @@ async def clear_warnings(ctx, member: discord.Member):
 
 @bot.command(name='purge')
 @commands.has_permissions(manage_messages=True)
-async def purge(ctx, member: discord.Member = None, amount: int = None):
-    """Delete messages - can target specific user or delete all messages"""
-    if member is None and amount is None:
-        await ctx.send("❌ Usage: `,purge @user amount` or `,purge amount`")
-        return
-    
-    # If only one argument provided, treat it as amount for all messages
-    if amount is None and isinstance(member, int):
-        amount = member
-        member = None
-    
+async def purge(ctx, amount: int = None, member: discord.Member = None):
+    """Delete messages - usage: ,purge <amount> or ,purge <amount> @user"""
     if amount is None:
-        await ctx.send("❌ Please specify the amount of messages to delete.")
+        await ctx.send("❌ Usage: `,purge <amount>` or `,purge <amount> @user`")
         return
     
     if amount > 100:
@@ -328,16 +362,13 @@ async def purge(ctx, member: discord.Member = None, amount: int = None):
     
     try:
         if member:
-            # Delete messages from specific user
             def check(m):
                 return m.author.id == member.id
             
             deleted = await ctx.channel.purge(limit=100, check=check)
-            # Only count up to the amount requested
             deleted = deleted[:amount]
             msg = await ctx.send(f"Deleted {len(deleted)} messages from {member.mention}.")
         else:
-            # Delete all messages
             deleted = await ctx.channel.purge(limit=amount + 1)
             msg = await ctx.send(f"Deleted {len(deleted) - 1} messages.")
         
@@ -366,6 +397,8 @@ async def slowmode(ctx, seconds: int):
     """Set slowmode for the channel"""
     await ctx.channel.edit(slowmode_delay=seconds)
     await ctx.send(f"Slowmode set to {seconds} seconds.")
+
+# ==================== Role Management ====================
 
 @bot.command(name='addrole')
 @commands.has_permissions(manage_roles=True)
@@ -433,24 +466,149 @@ async def roles(ctx, member: discord.Member = None):
     embed.set_footer(text=f"Total roles: {len(roles)}")
     await ctx.send(embed=embed)
 
-# Fun Commands
+# ==================== Fun Commands ====================
 
 @bot.command(name='cussout')
 async def cussout(ctx, member: discord.Member):
-    """Cuss out a user"""
+    """Cuss out a user - Only available to bot owner"""
+    OWNER_ID = 1110957708506570804
+    
+    if ctx.author.id != OWNER_ID:
+        await ctx.send(f"{ctx.author.mention} you aint my owner lil sport piss off cant use this shit")
+        return
+    
     cuss_message = "hey big bum motherfucker shut yo raggedy ass up u piece of shit"
     
-    # Check if the command message is replying to another message
     if ctx.message.reference:
-        # Get the message being replied to
         replied_message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        # Reply to that message with the cuss out
         await replied_message.reply(f"{member.mention} {cuss_message}")
     else:
-        # Just mention the user if not replying to a message
         await ctx.send(f"{member.mention} {cuss_message}")
 
-# Utility Commands
+def hex_to_color(hex_code):
+    """Convert hex code to discord.Color"""
+    hex_code = hex_code.strip('#')
+    return discord.Color(int(hex_code, 16))
+
+@bot.command(name='rolecolor')
+async def rolecolor(ctx):
+    """Create a custom colored role with your username"""
+    await ctx.send(f"{ctx.author.mention} Please provide a hex color code (e.g., #FF5733 or FF5733):")
+    
+    def check(m):
+        return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+    
+    try:
+        hex_msg = await bot.wait_for('message', check=check, timeout=60.0)
+        hex_code = hex_msg.content.strip()
+        
+        try:
+            color = hex_to_color(hex_code)
+        except ValueError:
+            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
+            return
+        
+        user_roles = [role for role in ctx.author.roles if role.name != "@everyone"]
+        highest_role = max(user_roles, key=lambda r: r.position) if user_roles else None
+        
+        role_name = ctx.author.name
+        new_role = await ctx.guild.create_role(
+            name=role_name,
+            color=color,
+            reason=f"Custom color role for {ctx.author}"
+        )
+        
+        if highest_role:
+            try:
+                await new_role.edit(position=highest_role.position + 1)
+            except discord.Forbidden:
+                await ctx.send("⚠️ Role created but couldn't move it above your highest role. Bot role might be too low.")
+        
+        await ctx.author.add_roles(new_role)
+        
+        embed = discord.Embed(
+            title="✨ Custom Role Created!",
+            description=f"Role **{role_name}** has been created with your custom color!",
+            color=color
+        )
+        embed.add_field(name="Hex Code", value=hex_code.upper())
+        embed.set_footer(text=f"Created for {ctx.author}")
+        await ctx.send(embed=embed)
+        
+    except asyncio.TimeoutError:
+        await ctx.send("❌ Timeout! You took too long to respond.")
+
+@bot.command(name='gradientrole')
+async def gradientrole(ctx):
+    """Create a gradient colored role"""
+    await ctx.send(f"{ctx.author.mention} Please provide the FIRST hex color code (e.g., #FF5733):")
+    
+    def check(m):
+        return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+    
+    try:
+        hex_msg1 = await bot.wait_for('message', check=check, timeout=60.0)
+        hex_code1 = hex_msg1.content.strip()
+        
+        try:
+            color1 = hex_to_color(hex_code1)
+        except ValueError:
+            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
+            return
+        
+        await ctx.send(f"{ctx.author.mention} Now provide the SECOND hex color code:")
+        
+        hex_msg2 = await bot.wait_for('message', check=check, timeout=60.0)
+        hex_code2 = hex_msg2.content.strip()
+        
+        try:
+            color2 = hex_to_color(hex_code2)
+        except ValueError:
+            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
+            return
+        
+        r1, g1, b1 = color1.r, color1.g, color1.b
+        r2, g2, b2 = color2.r, color2.g, color2.b
+        
+        mid_r = (r1 + r2) // 2
+        mid_g = (g1 + g2) // 2
+        mid_b = (b1 + b2) // 2
+        
+        gradient_color = discord.Color.from_rgb(mid_r, mid_g, mid_b)
+        
+        user_roles = [role for role in ctx.author.roles if role.name != "@everyone"]
+        highest_role = max(user_roles, key=lambda r: r.position) if user_roles else None
+        
+        role_name = ctx.author.name
+        new_role = await ctx.guild.create_role(
+            name=role_name,
+            color=gradient_color,
+            reason=f"Gradient color role for {ctx.author}"
+        )
+        
+        if highest_role:
+            try:
+                await new_role.edit(position=highest_role.position + 1)
+            except discord.Forbidden:
+                await ctx.send("⚠️ Role created but couldn't move it above your highest role. Bot role might be too low.")
+        
+        await ctx.author.add_roles(new_role)
+        
+        embed = discord.Embed(
+            title="🌈 Gradient Role Created!",
+            description=f"Role **{role_name}** has been created with a gradient color!",
+            color=gradient_color
+        )
+        embed.add_field(name="Color 1", value=hex_code1.upper(), inline=True)
+        embed.add_field(name="Color 2", value=hex_code2.upper(), inline=True)
+        embed.add_field(name="Result", value=f"#{mid_r:02x}{mid_g:02x}{mid_b:02x}".upper(), inline=True)
+        embed.set_footer(text=f"Created for {ctx.author} | Note: Discord shows the middle gradient color")
+        await ctx.send(embed=embed)
+        
+    except asyncio.TimeoutError:
+        await ctx.send("❌ Timeout! You took too long to respond.")
+
+# ==================== Utility Commands ====================
 
 @bot.command(name='serverinfo')
 async def serverinfo(ctx):
@@ -477,7 +635,7 @@ async def userinfo(ctx, member: discord.Member = None):
     """Display user information"""
     member = member or ctx.author
     embed = discord.Embed(
-        title=f"{member.name}#{member.discriminator}",
+        title=f"{member.name}",
         color=member.color
     )
     embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
@@ -508,7 +666,6 @@ async def avatar(ctx, member: discord.Member = None):
 async def banner(ctx, member: discord.Member = None):
     """Display user's banner or server banner"""
     if member:
-        # Fetch user to get banner info
         user = await bot.fetch_user(member.id)
         if user.banner:
             embed = discord.Embed(
@@ -522,7 +679,6 @@ async def banner(ctx, member: discord.Member = None):
         else:
             await ctx.send(f"{member.mention} doesn't have a banner.")
     else:
-        # Show server banner
         if ctx.guild.banner:
             embed = discord.Embed(
                 title=f"{ctx.guild.name}'s Banner",
@@ -537,7 +693,7 @@ async def banner(ctx, member: discord.Member = None):
 
 @bot.command(name='poll')
 async def poll(ctx, question, *options):
-    """Create a poll (?poll "Question" "Option 1" "Option 2")"""
+    """Create a poll (,poll "Question" "Option 1" "Option 2")"""
     if len(options) > 10:
         await ctx.send("Maximum 10 options allowed.")
         return
@@ -580,18 +736,15 @@ async def afk(ctx, *, reason="AFK"):
     """Set yourself as AFK with a custom message"""
     user_id = ctx.author.id
     
-    # Store original nickname
     original_nick = ctx.author.nick or ctx.author.name
     
-    # Add [AFK] to nickname if possible
     try:
         new_nick = f"[AFK] {original_nick}"
-        if len(new_nick) <= 32:  # Discord nickname limit
+        if len(new_nick) <= 32:
             await ctx.author.edit(nick=new_nick)
     except:
-        pass  # Might not have permission to change nickname
+        pass
     
-    # Store AFK status
     afk_users[user_id] = {
         'reason': reason,
         'original_nick': original_nick
@@ -605,24 +758,33 @@ async def afk(ctx, *, reason="AFK"):
     embed.add_field(name="Reason", value=reason)
     await ctx.reply(embed=embed)
 
-# Counting Game Commands
+# ==================== Counting Game ====================
 
 @bot.command(name='setcounting')
 @commands.has_permissions(manage_channels=True)
 async def setcounting(ctx):
     """Set the current channel as a counting channel"""
+    if ctx.channel.id in counting_channels:
+        await ctx.send("❌ This channel is already a counting channel! Use `,countingstatus` to see the current count.")
+        return
+    
     counting_channels[ctx.channel.id] = {
         'count': 0,
-        'last_user': None
+        'last_user': None,
+        'total_counts': 0,
+        'highest_count': 0,
+        'fails': 0
     }
+    save_counting_data()
     
     embed = discord.Embed(
         title="🔢 Counting Game Started!",
         description=f"{ctx.channel.mention} is now a counting channel!",
         color=discord.Color.green()
     )
-    embed.add_field(name="Rules", value="• Start counting from 1\n• Each person can only count once in a row\n• Count sequentially (1, 2, 3...)\n• If you mess up, count resets to 1", inline=False)
+    embed.add_field(name="Rules", value="• Start counting from 1\n• Each person can only count once in a row\n• Count sequentially (1, 2, 3...)\n• If you mess up, count resets to 1\n• After a reset, the next number MUST be 1", inline=False)
     embed.add_field(name="Start", value="Someone type `1` to begin!", inline=False)
+    embed.set_footer(text="📊 Stats are being tracked! Use ,countingstatus to view")
     await ctx.send(embed=embed)
 
 @bot.command(name='removecounting')
@@ -630,8 +792,19 @@ async def setcounting(ctx):
 async def removecounting(ctx):
     """Remove counting game from the current channel"""
     if ctx.channel.id in counting_channels:
+        game = counting_channels[ctx.channel.id]
+        embed = discord.Embed(
+            title="🔢 Counting Game Removed",
+            description="Final Statistics",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Highest Count Reached", value=str(game.get('highest_count', 0)), inline=True)
+        embed.add_field(name="Total Numbers Counted", value=str(game.get('total_counts', 0)), inline=True)
+        embed.add_field(name="Total Fails", value=str(game.get('fails', 0)), inline=True)
+        
         del counting_channels[ctx.channel.id]
-        await ctx.send("🔢 Counting game removed from this channel.")
+        save_counting_data()
+        await ctx.send(embed=embed)
     else:
         await ctx.send("❌ This channel is not a counting channel.")
 
@@ -646,9 +819,22 @@ async def countingstatus(ctx):
             color=discord.Color.blue()
         )
         if game['last_user']:
-            last_user = await bot.fetch_user(game['last_user'])
-            embed.add_field(name="Last Counter", value=last_user.mention)
-        embed.add_field(name="Next Number", value=str(game['count'] + 1))
+            try:
+                last_user = await bot.fetch_user(game['last_user'])
+                embed.add_field(name="Last Counter", value=last_user.mention, inline=True)
+            except:
+                embed.add_field(name="Last Counter", value="Unknown User", inline=True)
+        
+        embed.add_field(name="Next Number", value=str(game['count'] + 1), inline=True)
+        embed.add_field(name="Highest Count", value=str(game.get('highest_count', 0)), inline=True)
+        embed.add_field(name="Total Counts", value=str(game.get('total_counts', 0)), inline=True)
+        embed.add_field(name="Total Fails", value=str(game.get('fails', 0)), inline=True)
+        
+        total = game.get('total_counts', 0) + game.get('fails', 0)
+        if total > 0:
+            success_rate = (game.get('total_counts', 0) / total) * 100
+            embed.add_field(name="Success Rate", value=f"{success_rate:.1f}%", inline=True)
+        
         await ctx.send(embed=embed)
     else:
         await ctx.send("❌ This channel is not a counting channel. Use `,setcounting` to start!")
@@ -658,13 +844,23 @@ async def countingstatus(ctx):
 async def resetcount(ctx):
     """Reset the count in this channel"""
     if ctx.channel.id in counting_channels:
+        old_count = counting_channels[ctx.channel.id]['count']
         counting_channels[ctx.channel.id]['count'] = 0
         counting_channels[ctx.channel.id]['last_user'] = None
-        await ctx.send("🔢 Count has been reset to 0!")
+        save_counting_data()
+        
+        embed = discord.Embed(
+            title="🔢 Count Manually Reset",
+            description=f"Count has been reset from {old_count} to 0!",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Next Number", value="1")
+        embed.set_footer(text=f"Reset by {ctx.author}")
+        await ctx.send(embed=embed)
     else:
         await ctx.send("❌ This channel is not a counting channel.")
 
-# Tic Tac Toe Commands
+# ==================== Tic Tac Toe ====================
 
 class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
@@ -675,22 +871,18 @@ class TicTacToeButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction):
         view: TicTacToeView = self.view
         
-        # Check if it's the user's turn
         if interaction.user.id != view.current_player:
             await interaction.response.send_message("❌ It's not your turn!", ephemeral=True)
             return
         
-        # Make the move
         position = self.y * 3 + self.x
         if view.board[position] != ' ':
             await interaction.response.send_message("❌ That spot is already taken!", ephemeral=True)
             return
         
-        # Update board
         symbol = 'X' if interaction.user.id == view.x_player else 'O'
         view.board[position] = symbol
         
-        # Update button
         if symbol == 'X':
             self.style = discord.ButtonStyle.danger
             self.label = '❌'
@@ -699,7 +891,6 @@ class TicTacToeButton(discord.ui.Button):
             self.label = '⭕'
         self.disabled = True
         
-        # Check for winner
         winner = view.check_winner()
         
         if winner:
@@ -720,7 +911,6 @@ class TicTacToeButton(discord.ui.Button):
             
             view.stop()
         else:
-            # Switch turns
             view.current_player = view.o_player if view.current_player == view.x_player else view.x_player
             current_user = view.x_user if view.current_player == view.x_player else view.o_user
             current_symbol = '❌' if view.current_player == view.x_player else '⭕'
@@ -747,7 +937,6 @@ class TicTacToeView(discord.ui.View):
         )
         self.embed.add_field(name="Current Turn", value=f"{x_user.mention} (❌)")
         
-        # Create 3x3 grid of buttons
         for y in range(3):
             for x in range(3):
                 self.add_item(TicTacToeButton(x, y))
@@ -755,9 +944,9 @@ class TicTacToeView(discord.ui.View):
     def check_winner(self):
         """Check if there's a winner"""
         winning_combos = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8],  # Rows
-            [0, 3, 6], [1, 4, 7], [2, 5, 8],  # Columns
-            [0, 4, 8], [2, 4, 6]              # Diagonals
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
         ]
         
         for combo in winning_combos:
@@ -792,6 +981,8 @@ async def tictactoe(ctx, opponent: discord.Member):
     view = TicTacToeView(ctx.author, opponent)
     view.message = await ctx.send(embed=view.embed, view=view)
 
+# ==================== Help Command ====================
+
 @bot.command(name='help')
 async def help_command(ctx):
     """Display help information"""
@@ -821,13 +1012,13 @@ async def help_command(ctx):
     
     embed.add_field(
         name="🎉 Fun",
-        value="`cussout` - Cuss out a user",
+        value="`cussout` - Cuss out a user\n`rolecolor` - Create a custom colored role\n`gradientrole` - Create a gradient colored role",
         inline=False
     )
     
     embed.add_field(
         name="🔢 Counting Game",
-        value="`setcounting`, `removecounting`, `countingstatus`, `resetcount`",
+        value="`setcounting`, `removecounting`, `countingstatus`, `resetcount`\n*Stats are automatically saved and persist through restarts!*",
         inline=False
     )
     
@@ -839,11 +1030,11 @@ async def help_command(ctx):
     
     await ctx.send(embed=embed)
 
-# Error handling
+# ==================== Error Handling ====================
+
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
-        # Silently ignore invalid commands
         return
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("❌ You don't have permission to use this command.")
@@ -854,9 +1045,7 @@ async def on_command_error(ctx, error):
     else:
         await ctx.send(f"❌ An error occurred: {str(error)}")
 
-#============================================================================
-# BOT TOKEN - LOADED FROM ENVIRONMENT VARIABLES
-#============================================================================
+# ==================== Run Bot ====================
 
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
@@ -869,6 +1058,5 @@ if not TOKEN:
 
 print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
-# Run the bot
 if __name__ == "__main__":
     bot.run(TOKEN)
