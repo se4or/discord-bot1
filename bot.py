@@ -539,7 +539,6 @@ async def lexi(ctx):
             
             # Create an embed to frame the GIF nicely
             embed = discord.Embed(
-                title="💖 Here's your Hello Kitty! 💖",
                 color=discord.Color.pink()
             )
             embed.set_image(url=random_gif)
@@ -1165,5 +1164,6 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
+
 
 
