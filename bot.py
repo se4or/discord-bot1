@@ -73,8 +73,8 @@ async def on_message(message):
     if message.author.bot:
         return
     
-    # Check if bot is mentioned
-    if bot.user in message.mentions:
+    # Check if bot is mentioned (but not in a reply to avoid double responses)
+    if bot.user in message.mentions and not message.reference:
         await message.reply("fuck u want")
     
     # Check for AFK users in mentions
