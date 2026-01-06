@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import json
 import os
 from dotenv import load_dotenv
+import random
+import aiohttp
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +31,38 @@ afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
 
 # Counting game storage with persistent file
 COUNTING_DATA_FILE = 'counting_data.json'
+
+# Tenor API configuration
+TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # Public Tenor API key
+TENOR_SEARCH_URL = "https://tenor.googleapis.com/v2/search"
+
+async def fetch_hello_kitty_gifs():
+    """Fetch random Hello Kitty GIFs from Tenor API"""
+    # Use a random position to get different results each time
+    random_pos = random.randint(0, 100)
+    
+    params = {
+        "q": "hello kitty",
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)  # This helps randomize which batch of results you get
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # Get the GIF URL from each result
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
 
 def load_counting_data():
     """Load counting data from file"""
@@ -492,6 +526,21 @@ async def cussout(ctx, member: discord.Member):
         await replied_message.reply(f"{member.mention} {cuss_message}")
     else:
         await ctx.send(f"{member.mention} {cuss_message}")
+
+@bot.command(name='lexi', aliases=['Lexi', 'LEXI', 'lExi', 'lEXi', 'lEXI', 'LExi', 'LExI', 'LEXi'])
+async def lexi(ctx):
+    """Send a random Hello Kitty GIF from Tenor"""
+    try:
+        # Fetch fresh GIFs from Tenor API
+        gifs = await fetch_hello_kitty_gifs()
+        
+        if gifs:
+            random_gif = random.choice(gifs)
+            await ctx.reply(f"{ctx.author.mention} {random_gif}")
+        else:
+            await ctx.send(f"❌ Failed to fetch Hello Kitty GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Hello Kitty GIF: {e}")
 
 def hex_to_color(hex_code):
     """Convert hex code to discord.Color"""
@@ -1001,38 +1050,8 @@ async def help_command(ctx):
     )
     
     embed.add_field(
-        name="🛡️ Moderation",
-        value="`ban`, `unban`, `kick`, `mute`, `unmute`, `warn`, `warnings`, `clearwarns`, `purge`, `lock`, `unlock`, `slowmode`",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="👥 Role Management",
-        value="`addrole`, `removerole`, `roleinfo`, `roles`",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🔧 Utility",
-        value="`serverinfo`, `userinfo`, `avatar`, `banner`, `poll`, `announce`, `afk`, `help`",
-        inline=False
-    )
-    
-    embed.add_field(
         name="🎉 Fun",
-        value="`cussout` - Cuss out a user\n`rolecolor` - Create a custom colored role\n`gradientrole` - Create a gradient colored role",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🔢 Counting Game",
-        value="`setcounting`, `removecounting`, `countingstatus`, `resetcount`\n*Stats are automatically saved and persist through restarts!*",
-        inline=False
-    )
-    
-    embed.add_field(
-        name="🎮 Games",
-        value="`tictactoe` - Play tic tac toe with another user",
+        value="`lexi` - Send a random Hello Kitty GIF",
         inline=False
     )
     
