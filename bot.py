@@ -34,16 +34,28 @@ TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # Public Tenor API ke
 TENOR_SEARCH_URL = "https://tenor.googleapis.com/v2/search"
 
 async def fetch_hello_kitty_gifs():
-    """Fetch random Hello Kitty GIFs from Tenor API"""
+    """Fetch random Hello Kitty and Friends GIFs from Tenor API"""
     # Use a random position to get different results each time
     random_pos = random.randint(0, 100)
     
+    # Alternate between different search queries for variety
+    search_queries = [
+        "hello kitty",
+        "hello kitty and friends",
+        "sanrio hello kitty",
+        "hello kitty my melody",
+        "hello kitty characters"
+    ]
+    
+    # Pick a random search query
+    search_query = random.choice(search_queries)
+    
     params = {
-        "q": "hello kitty",
+        "q": search_query,
         "key": TENOR_API_KEY,
         "client_key": "discord_bot",
         "limit": 50,
-        "pos": str(random_pos)  # This helps randomize which batch of results you get
+        "pos": str(random_pos)
     }
     
     try:
@@ -443,7 +455,7 @@ async def cussout(ctx, member: discord.Member):
 
 @bot.command(name='lexi', aliases=['Lexi', 'LEXI', 'lExi', 'lEXi', 'lEXI', 'LExi', 'LExI', 'LEXi'])
 async def lexi(ctx):
-    """Send a random Hello Kitty GIF from Tenor"""
+    """Send a random Hello Kitty & Friends GIF from Tenor"""
     try:
         # Fetch fresh GIFs from Tenor API
         gifs = await fetch_hello_kitty_gifs()
@@ -461,9 +473,9 @@ async def lexi(ctx):
             # Reply without pinging (@)
             await ctx.reply(embed=embed, mention_author=False)
         else:
-            await ctx.send(f"❌ Failed to fetch Hello Kitty GIFs from Tenor")
+            await ctx.send(f"❌ Failed to fetch Hello Kitty & Friends GIFs from Tenor")
     except Exception as e:
-        await ctx.send(f"❌ Failed to send Hello Kitty GIF: {e}")
+        await ctx.send(f"❌ Failed to send Hello Kitty & Friends GIF: {e}")
 
 def hex_to_color(hex_code):
     """Convert hex code to discord.Color"""
@@ -964,3 +976,4 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
+
