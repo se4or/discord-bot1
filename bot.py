@@ -93,6 +93,29 @@ async def on_message(message):
     if message.author.bot:
         return
     
+    # Check if the message author is AFK and clear their status
+    if message.author.id in afk_users:
+        afk_data = afk_users[message.author.id]
+        
+        # Try to restore original nickname
+        try:
+            if message.author.nick and message.author.nick.startswith('[AFK] '):
+                original_nick = afk_data.get('original_nick')
+                await message.author.edit(nick=original_nick)
+        except:
+            pass
+        
+        # Remove from AFK list
+        del afk_users[message.author.id]
+        
+        # Send welcome back message
+        welcome_msg = await message.channel.send(f"{message.author.mention} BITCH IM BACK OUTTA MY COMA")
+        await asyncio.sleep(5)
+        try:
+            await welcome_msg.delete()
+        except:
+            pass
+    
     # Check if bot is mentioned (but not in a reply to avoid double responses)
     if bot.user in message.mentions and not message.reference:
         await message.reply("fuck u want")
@@ -124,28 +147,7 @@ async def on_message(message):
         await asyncio.sleep(3)
         processing_lock.discard(command_key)
         print(f"[RELEASED] Message {message.id} - Lock released")
-
-@bot.before_invoke
-async def before_any_command(ctx):
-    """This runs before every command"""
-    print(f"[BEFORE_INVOKE] Command: {ctx.command.name} | User: {ctx.author} | Message ID: {ctx.message.id}")
-    
-    if ctx.author.id in afk_users:
-        afk_data = afk_users[ctx.author.id]
-        try:
-            if ctx.author.nick and ctx.author.nick.startswith('[AFK] '):
-                original_nick = afk_data.get('original_nick')
-                await ctx.author.edit(nick=original_nick)
-        except:
-            pass
         
-        del afk_users[ctx.author.id]
-        welcome_msg = await ctx.send(f"{ctx.author.mention} BITCH IM BACK OUTTA MY COMA")
-        await asyncio.sleep(5)
-        try:
-            await welcome_msg.delete()
-        except:
-            pass
 
 @bot.after_invoke
 async def after_any_command(ctx):
@@ -976,4 +978,5 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
+
 
