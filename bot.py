@@ -534,7 +534,7 @@ async def rolecolor(ctx):
 
 @bot.command(name='gradientrole')
 async def gradientrole(ctx):
-    """Create gradient colored roles (creates 5 transitioning roles)"""
+    """Create a gradient colored role"""
     await ctx.send(f"{ctx.author.mention} Please provide the FIRST hex color code (e.g., #FF5733):")
     
     def check(m):
@@ -561,66 +561,46 @@ async def gradientrole(ctx):
             await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
             return
         
-        # Create 5 gradient steps
         r1, g1, b1 = color1.r, color1.g, color1.b
         r2, g2, b2 = color2.r, color2.g, color2.b
         
-        status_msg = await ctx.send("🌈 Creating gradient roles... This may take a moment.")
+        mid_r = (r1 + r2) // 2
+        mid_g = (g1 + g2) // 2
+        mid_b = (b1 + b2) // 2
+        
+        gradient_color = discord.Color.from_rgb(mid_r, mid_g, mid_b)
         
         user_roles = [role for role in ctx.author.roles if role.name != "@everyone"]
         highest_role = max(user_roles, key=lambda r: r.position) if user_roles else None
-        base_position = highest_role.position + 1 if highest_role else 1
         
-        created_roles = []
-        num_steps = 5
+        role_name = ctx.author.name
+        new_role = await ctx.guild.create_role(
+            name=role_name,
+            color=gradient_color,
+            reason=f"Gradient color role for {ctx.author}"
+        )
         
-        for i in range(num_steps):
-            # Calculate intermediate color
-            ratio = i / (num_steps - 1)
-            step_r = int(r1 + (r2 - r1) * ratio)
-            step_g = int(g1 + (g2 - g1) * ratio)
-            step_b = int(b1 + (b2 - b1) * ratio)
-            
-            gradient_color = discord.Color.from_rgb(step_r, step_g, step_b)
-            
-            # Create role with gradient step name
-            role_name = f"{ctx.author.name} {i+1}"
-            new_role = await ctx.guild.create_role(
-                name=role_name,
-                color=gradient_color,
-                reason=f"Gradient color role for {ctx.author}"
-            )
-            
-            created_roles.append(new_role)
-            
-            # Try to position the role
+        if highest_role:
             try:
-                await new_role.edit(position=base_position + i)
+                await new_role.edit(position=highest_role.position + 1)
             except discord.Forbidden:
-                pass
-            
-            # Add role to user
-            await ctx.author.add_roles(new_role)
-            
-            await asyncio.sleep(0.5)  # Small delay to avoid rate limits
+                await ctx.send("⚠️ Role created but couldn't move it above your highest role. Bot role might be too low.")
         
-        await status_msg.delete()
+        await ctx.author.add_roles(new_role)
         
         embed = discord.Embed(
-            title="🌈 Gradient Roles Created!",
-            description=f"Created {num_steps} gradient roles for **{ctx.author.name}**!",
-            color=created_roles[2].color  # Use middle color
+            title="🌈 Gradient Role Created!",
+            description=f"Role **{role_name}** has been created with a gradient color!",
+            color=gradient_color
         )
-        embed.add_field(name="Start Color", value=hex_code1.upper(), inline=True)
-        embed.add_field(name="End Color", value=hex_code2.upper(), inline=True)
-        embed.add_field(name="Roles Created", value=", ".join([r.mention for r in created_roles]), inline=False)
-        embed.set_footer(text=f"Created for {ctx.author} | Gradient effect with {num_steps} color transitions")
+        embed.add_field(name="Color 1", value=hex_code1.upper(), inline=True)
+        embed.add_field(name="Color 2", value=hex_code2.upper(), inline=True)
+        embed.add_field(name="Result", value=f"#{mid_r:02x}{mid_g:02x}{mid_b:02x}".upper(), inline=True)
+        embed.set_footer(text=f"Created for {ctx.author} | Note: Discord shows the middle gradient color")
         await ctx.send(embed=embed)
         
     except asyncio.TimeoutError:
         await ctx.send("❌ Timeout! You took too long to respond.")
-    except Exception as e:
-        await ctx.send(f"❌ Error creating gradient roles: {e}")
 
 # ==================== Utility Commands ====================
 
@@ -687,6 +667,18 @@ async def banner(ctx, member: discord.Member = None):
                 color=member.color
             )
             banner_url = user.banner.url
+            embed.set_image(url=banner_url)
+            embed.add_field(name="Download", value=f"[Click here]({banner_url})")
+            await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"{member.mention} doesn't have a banner.")
+    else:
+        if ctx.guild.banner:
+            embed = discord.Embed(
+                title=f"{ctx.guild.name}'s Banner",
+                color=discord.Color.blue()
+            )
+            banner_url = ctx.guild.banner.url
             embed.set_image(url=banner_url)
             embed.add_field(name="Download", value=f"[Click here]({banner_url})")
             await ctx.send(embed=embed)
@@ -930,7 +922,7 @@ async def help_command(ctx):
         value=(
             "`lexi` - Random Hello Kitty GIF\n"
             "`rolecolor` - Create custom colored role\n"
-            "`gradientrole` - Create gradient colored roles\n"
+            "`gradientrole` - Create gradient colored role\n"
             "`tictactoe @user` - Play tic-tac-toe\n"
             "`cussout @user` - Cuss out user (owner only)"
         ),
@@ -985,16 +977,6 @@ if not TOKEN:
 print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
-    bot.run(TOKEN).send(f"{member.mention} doesn't have a banner.")
-    else:
-        if ctx.guild.banner:
-            embed = discord.Embed(
-                title=f"{ctx.guild.name}'s Banner",
-                color=discord.Color.blue()
-            )
-            banner_url = ctx.guild.banner.url
-            embed.set_image(url=banner_url)
-            embed.add_field(name="Download", value=f"[Click here]({banner_url})")
-            await ctx.send(embed=embed)
-        else:
-            await ctx
+    bot.run(TOKEN)
+
+
