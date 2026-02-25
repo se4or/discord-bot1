@@ -35,10 +35,8 @@ TENOR_SEARCH_URL = "https://tenor.googleapis.com/v2/search"
 
 async def fetch_hello_kitty_gifs():
     """Fetch random Hello Kitty and Friends GIFs from Tenor API"""
-    # Use a random position to get different results each time
     random_pos = random.randint(0, 100)
     
-    # Alternate between different search queries for variety
     search_queries = [
         "hello kitty",
         "hello kitty and friends",
@@ -47,7 +45,6 @@ async def fetch_hello_kitty_gifs():
         "hello kitty characters"
     ]
     
-    # Pick a random search query
     search_query = random.choice(search_queries)
     
     params = {
@@ -63,7 +60,42 @@ async def fetch_hello_kitty_gifs():
             async with session.get(TENOR_SEARCH_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    # Get the GIF URL from each result
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
+
+async def fetch_beyonce_gifs():
+    """Fetch random Beyonce GIFs from Tenor API"""
+    random_pos = random.randint(0, 100)
+    
+    search_queries = [
+        "beyonce",
+        "beyonce dance",
+        "beyonce performance",
+        "beyonce queen",
+        "beyonce slay"
+    ]
+    
+    search_query = random.choice(search_queries)
+    
+    params = {
+        "q": search_query,
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
                     gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
                     return gifs if gifs else None
                 else:
@@ -97,7 +129,6 @@ async def on_message(message):
     if message.author.id in afk_users:
         afk_data = afk_users[message.author.id]
         
-        # Try to restore original nickname
         try:
             if message.author.nick and message.author.nick.startswith('[AFK] '):
                 original_nick = afk_data.get('original_nick')
@@ -105,10 +136,8 @@ async def on_message(message):
         except:
             pass
         
-        # Remove from AFK list
         del afk_users[message.author.id]
         
-        # Send welcome back message
         welcome_msg = await message.channel.send(f"{message.author.mention} BITCH IM BACK OUTTA MY COMA")
         await asyncio.sleep(5)
         try:
@@ -116,11 +145,9 @@ async def on_message(message):
         except:
             pass
     
-    # Check if bot is mentioned (but not in a reply to avoid double responses)
     if bot.user in message.mentions and not message.reference:
         await message.reply("fuck u want")
     
-    # Check for AFK users in mentions
     for mentioned_user in message.mentions:
         if mentioned_user.id in afk_users:
             afk_data = afk_users[mentioned_user.id]
@@ -459,25 +486,51 @@ async def cussout(ctx, member: discord.Member):
 async def lexi(ctx):
     """Send a random Hello Kitty & Friends GIF from Tenor"""
     try:
-        # Fetch fresh GIFs from Tenor API
         gifs = await fetch_hello_kitty_gifs()
         
         if gifs:
             random_gif = random.choice(gifs)
             
-            # Create an embed to frame the GIF nicely
             embed = discord.Embed(
                 color=discord.Color.pink()
             )
             embed.set_image(url=random_gif)
             embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             
-            # Reply without pinging (@)
             await ctx.reply(embed=embed, mention_author=False)
         else:
             await ctx.send(f"❌ Failed to fetch Hello Kitty & Friends GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Hello Kitty & Friends GIF: {e}")
+
+@bot.command(name='beyonce', aliases=[
+    'Beyonce', 'BEYONCE', 'BEyonce', 'BEYonce', 'BEYOnce', 'BEYONce', 'BEYONCe',
+    'bEyonce', 'bEYonce', 'bEYOnce', 'bEYONce', 'bEYONCe', 'bEYONCE',
+    'beYonce', 'beYOnce', 'beYONce', 'beYONCe', 'beYONCE',
+    'beyOnce', 'beyONce', 'beyONCe', 'beyONCE',
+    'beyoNce', 'beyoNCe', 'beyoNCE',
+    'beyonCe', 'beyonCE',
+    'beyoncE'
+])
+async def beyonce(ctx):
+    """Send a random Beyonce GIF from Tenor"""
+    try:
+        gifs = await fetch_beyonce_gifs()
+        
+        if gifs:
+            random_gif = random.choice(gifs)
+            
+            embed = discord.Embed(
+                color=discord.Color.gold()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+            
+            await ctx.reply(embed=embed, mention_author=False)
+        else:
+            await ctx.send(f"❌ Failed to fetch Beyonce GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Beyonce GIF: {e}")
 
 def hex_to_color(hex_code):
     """Convert hex code to discord.Color"""
@@ -834,7 +887,6 @@ class TicTacToeView(discord.ui.View):
                 self.add_item(TicTacToeButton(x, y))
     
     def check_winner(self):
-        """Check if there's a winner"""
         winning_combos = [
             [0, 1, 2], [3, 4, 5], [6, 7, 8],
             [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -884,7 +936,6 @@ async def help_command(ctx):
         color=discord.Color.blue()
     )
     
-    # Moderation Commands
     embed.add_field(
         name="⚖️ Moderation",
         value=(
@@ -904,7 +955,6 @@ async def help_command(ctx):
         inline=False
     )
     
-    # Role Management
     embed.add_field(
         name="👑 Role Management",
         value=(
@@ -916,11 +966,11 @@ async def help_command(ctx):
         inline=False
     )
     
-    # Fun Commands
     embed.add_field(
         name="🎉 Fun",
         value=(
             "`lexi` - Random Hello Kitty GIF\n"
+            "`beyonce` - Random Beyonce GIF\n"
             "`rolecolor` - Create custom colored role\n"
             "`gradientrole` - Create gradient colored role\n"
             "`tictactoe @user` - Play tic-tac-toe\n"
@@ -929,7 +979,6 @@ async def help_command(ctx):
         inline=False
     )
     
-    # Utility Commands
     embed.add_field(
         name="🔧 Utility",
         value=(
@@ -978,5 +1027,3 @@ print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
 
 if __name__ == "__main__":
     bot.run(TOKEN)
-
-
