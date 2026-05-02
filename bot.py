@@ -479,40 +479,41 @@ async def future(ctx):
     except Exception as e:
         await ctx.send(f"❌ Failed to send Future GIF: {e}")
  
-async def fetch_manon_gifs():
-    """Fetch random Manon Bannerman GIFs from Tenor API"""
-    random_pos = random.randint(0, 100)
+GIPHY_API_KEY = "2gapEiWNmBvQ6KM0fi5r87fAf793Wesi"
+GIPHY_SEARCH_URL = "https://api.giphy.com/v1/gifs/search"
  
+async def fetch_manon_gifs():
+    """Fetch random Manon Bannerman GIFs from Giphy API"""
     search_queries = [
         "manon bannerman",
         "manon bannerman singer",
         "manon bannerman music",
-        "manon bannerman performance",
-        "manon bannerman swiss singer",
     ]
  
     search_query = random.choice(search_queries)
+    offset = random.randint(0, 50)
  
     params = {
+        "api_key": GIPHY_API_KEY,
         "q": search_query,
-        "key": TENOR_API_KEY,
-        "client_key": "discord_bot",
-        "limit": 50,
-        "pos": str(random_pos)
+        "limit": 25,
+        "offset": offset,
+        "rating": "g",
+        "lang": "en"
     }
  
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+            async with session.get(GIPHY_SEARCH_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    gifs = [result['images']['original']['url'] for result in data.get('data', [])]
                     return gifs if gifs else None
                 else:
-                    print(f"Tenor API returned status {response.status}")
+                    print(f"Giphy API returned status {response.status}")
                     return None
     except Exception as e:
-        print(f"Error fetching GIFs from Tenor: {e}")
+        print(f"Error fetching GIFs from Giphy: {e}")
         return None
  
 @bot.command(name='manon', aliases=[
