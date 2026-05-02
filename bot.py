@@ -327,26 +327,35 @@ async def fetch_frankocean_gifs():
     """Fetch random Frank Ocean GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
     
-    search_queries = [
-        "frank ocean singer",
-        "frank ocean rapper",
-        "frank ocean blonde",
-        "frank ocean channel orange",
-        "frank ocean RnB",
-        "frank ocean music",
-        "frank ocean coachella",
-        "frank ocean grammy"
-    ]
-    
-    search_query = random.choice(search_queries)
-    
     params = {
-        "q": search_query,
+        "q": "frank ocean singer",
         "key": TENOR_API_KEY,
         "client_key": "discord_bot",
         "limit": 50,
         "pos": str(random_pos)
     }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gifs = []
+                    for result in data.get('results', []):
+                        title = result.get('title', '').lower()
+                        tags = [tag.lower() for tag in result.get('tags', [])]
+                        if 'frank ocean' in title or 'frank ocean' in ' '.join(tags):
+                            gifs.append(result['media_formats']['gif']['url'])
+                    # fallback if filter returns nothing
+                    if not gifs:
+                        gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
     
     try:
         async with aiohttp.ClientSession() as session:
