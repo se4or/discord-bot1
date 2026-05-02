@@ -323,6 +323,81 @@ async def rihanna(ctx):
     except Exception as e:
         await ctx.send(f"❌ Failed to send Rihanna GIF: {e}")
  
+async def fetch_frankocean_gifs():
+    """Fetch random Frank Ocean GIFs from Tenor API"""
+    random_pos = random.randint(0, 100)
+    
+    search_queries = [
+        "frank ocean",
+        "frank ocean singer",
+        "frank ocean performance",
+        "frank ocean blond",
+        "frank ocean channel orange"
+    ]
+    
+    search_query = random.choice(search_queries)
+    
+    params = {
+        "q": search_query,
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)
+    }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
+ 
+@bot.command(name='frankocean', aliases=[
+    # with space variations
+    'frank ocean', 'Frank Ocean', 'FRANK OCEAN', 'Frank ocean', 'frank Ocean',
+    'FRANK ocean', 'frank OCEAN', 'Frank OCEAN', 'FRANK Ocean',
+    # no space all caps combos
+    'Frankocean', 'FRANKOCEAN',
+    'fRankocean', 'fRAnkocean', 'fRANkocean', 'fRANKocean', 'fRANKOcean', 'fRANKOCean', 'fRANKOCEan', 'fRANKOCEAn', 'fRANKOCEAN',
+    'frAnkocean', 'frANkocean', 'frANKocean', 'frANKOcean', 'frANKOCean', 'frANKOCEan', 'frANKOCEAn', 'frANKOCEAN',
+    'fraNkocean', 'fraNKocean', 'fraNKOcean', 'fraNKOCean', 'fraNKOCEan', 'fraNKOCEAn', 'fraNKOCEAN',
+    'frankOcean', 'frankOCean', 'frankOCEan', 'frankOCEAn', 'frankOCEAN',
+    'frankoOcean', 'frankoCean', 'frankoOcean', 'frankocEan', 'frankocEAn', 'frankocEAN',
+    'frankoceAn', 'frankoceAN', 'frankocean',
+    'FrAnkocean', 'FrANkocean', 'FrANKocean', 'FrANKOcean', 'FrANKOCean', 'FrANKOCEan', 'FrANKOCEAn', 'FrANKOCEAN',
+    'FraNkocean', 'FraNKocean', 'FraNKOcean', 'FraNKOCean', 'FraNKOCEan', 'FraNKOCEAn', 'FraNKOCEAN',
+    'FrankOcean', 'FrankOCean', 'FrankOCEan', 'FrankOCEAn', 'FrankOCEAN',
+    'FrankoOcean', 'FrankoCean', 'FrankoOcean', 'FrankocEan', 'FrankocEAn', 'FrankocEAN',
+    'FrankoceAn', 'FrankoceAN',
+    'FRANkocean', 'FRANKocean', 'FRANKOcean', 'FRANKOCean', 'FRANKOCEan', 'FRANKOCEAn', 'FRANKoCean',
+])
+async def frankocean(ctx):
+    """Send a random Frank Ocean GIF from Tenor"""
+    try:
+        gifs = await fetch_frankocean_gifs()
+        
+        if gifs:
+            random_gif = random.choice(gifs)
+            
+            embed = discord.Embed(
+                color=discord.Color.gold()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+            
+            await ctx.reply(embed=embed, mention_author=False)
+        else:
+            await ctx.send(f"❌ Failed to fetch Frank Ocean GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Frank Ocean GIF: {e}")
+ 
 # ==================== Utility Commands ====================
  
 @bot.command(name='serverinfo')
@@ -704,6 +779,7 @@ async def help_command(ctx):
             "`lexi` - Random Hello Kitty GIF\n"
             "`beyonce` - Random Beyonce GIF\n"
             "`rihanna` - Random Rihanna GIF\n"
+            "`frankocean` - Random Frank Ocean GIF\n"
             "`tictactoe @user` - Play tic-tac-toe\n"
             "`cussout @user` - Cuss out user (owner only)"
         ),
