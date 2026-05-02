@@ -480,15 +480,15 @@ async def future(ctx):
         await ctx.send(f"❌ Failed to send Future GIF: {e}")
  
 async def fetch_manon_gifs():
-    """Fetch random Manon the singer GIFs from Tenor API"""
+    """Fetch random Manon Bannerman GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
  
     search_queries = [
-        "manon singer",
-        "manon music",
-        "manon performance",
-        "manon pop singer",
-        "manon artist",
+        "manon bannerman",
+        "manon bannerman singer",
+        "manon bannerman music",
+        "manon bannerman performance",
+        "manon bannerman swiss singer",
     ]
  
     search_query = random.choice(search_queries)
