@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 import random
 import aiohttp
 import pytz
-
+ 
 # Load environment variables
 load_dotenv()
-
+ 
 # Debug: Print if token was loaded
 if not os.getenv('DISCORD_TOKEN'):
     print("ERROR: DISCORD_TOKEN not found in environment variables!")
@@ -20,21 +20,21 @@ if not os.getenv('DISCORD_TOKEN'):
     print(f"Looking for .env file at: {os.path.join(os.getcwd(), '.env')}")
     print(f".env file exists: {os.path.exists('.env')}")
     exit(1)
-
+ 
 # Bot setup
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=',', intents=intents, help_command=None)
-
+ 
 # Storage for AFK users
 afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
-
+ 
 # Storage for user timezones
 user_timezones = {}  # {user_id: 'timezone_string'}
-
+ 
 # Tenor API configuration
 TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # Public Tenor API key
 TENOR_SEARCH_URL = "https://tenor.googleapis.com/v2/search"
-
+ 
 async def fetch_hello_kitty_gifs():
     """Fetch random Hello Kitty and Friends GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
@@ -70,7 +70,7 @@ async def fetch_hello_kitty_gifs():
     except Exception as e:
         print(f"Error fetching GIFs from Tenor: {e}")
         return None
-
+ 
 async def fetch_beyonce_gifs():
     """Fetch random Beyonce GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
@@ -106,10 +106,10 @@ async def fetch_beyonce_gifs():
     except Exception as e:
         print(f"Error fetching GIFs from Tenor: {e}")
         return None
-
+ 
 # Track command processing with a SHORT delay
 processing_lock = set()
-
+ 
 @bot.event
 async def on_ready():
     instance_id = os.getpid()
@@ -120,7 +120,7 @@ async def on_ready():
         print(f'Synced {len(synced)} commands [PID: {instance_id}]')
     except Exception as e:
         print(f'Failed to sync commands: {e}')
-
+ 
 @bot.event
 async def on_message(message):
     """Custom message handler to prevent duplicate processing"""
@@ -177,14 +177,14 @@ async def on_message(message):
         processing_lock.discard(command_key)
         print(f"[RELEASED] Message {message.id} - Lock released")
         
-
+ 
 @bot.after_invoke
 async def after_any_command(ctx):
     """This runs after every command"""
     print(f"[AFTER_INVOKE] Command: {ctx.command.name} | User: {ctx.author} | Message ID: {ctx.message.id}")
-
+ 
 # ==================== Fun Commands ====================
-
+ 
 @bot.command(name='cussout')
 async def cussout(ctx, member: discord.Member):
     """Cuss out a user - Only available to bot owner"""
@@ -201,7 +201,7 @@ async def cussout(ctx, member: discord.Member):
         await replied_message.reply(f"{member.mention} {cuss_message}")
     else:
         await ctx.send(f"{member.mention} {cuss_message}")
-
+ 
 @bot.command(name='lexi', aliases=['Lexi', 'LEXI', 'lExi', 'lEXi', 'lEXI', 'LExi', 'LExI', 'LEXi'])
 async def lexi(ctx):
     """Send a random Hello Kitty & Friends GIF from Tenor"""
@@ -222,7 +222,7 @@ async def lexi(ctx):
             await ctx.send(f"❌ Failed to fetch Hello Kitty & Friends GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Hello Kitty & Friends GIF: {e}")
-
+ 
 @bot.command(name='beyonce', aliases=[
     'Beyonce', 'BEYONCE', 'BEyonce', 'BEYonce', 'BEYOnce', 'BEYONce', 'BEYONCe',
     'bEyonce', 'bEYonce', 'bEYOnce', 'bEYONce', 'bEYONCe', 'bEYONCE',
@@ -251,7 +251,7 @@ async def beyonce(ctx):
             await ctx.send(f"❌ Failed to fetch Beyonce GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Beyonce GIF: {e}")
-
+ 
 async def fetch_rihanna_gifs():
     """Fetch random Rihanna GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
@@ -287,7 +287,7 @@ async def fetch_rihanna_gifs():
     except Exception as e:
         print(f"Error fetching GIFs from Tenor: {e}")
         return None
-
+ 
 @bot.command(name='rihanna', aliases=[
     'Rihanna', 'RIHANNA',
     'rIhanna', 'rIHanna', 'rIHAnna', 'rIHANna', 'rIHANNa', 'rIHANNA',
@@ -296,8 +296,8 @@ async def fetch_rihanna_gifs():
     'rihaNna', 'rihaNNa', 'rihaNNA',
     'rihanNa', 'rihanNA',
     'rihannA',
-    'Rihanna', 'RIhanna', 'RIHanna', 'RIHAnna', 'RIHANna', 'RIHANNa',
-    'rIhanna', 'RiHanna', 'RiHAnna', 'RiHANna', 'RiHANNa', 'RiHANNA',
+    'RIhanna', 'RIHanna', 'RIHAnna', 'RIHANna', 'RIHANNa',
+    'RiHanna', 'RiHAnna', 'RiHANna', 'RiHANNa', 'RiHANNA',
     'RihAnna', 'RihANna', 'RihANNa', 'RihANNA',
     'RihaNna', 'RihaNNa', 'RihaNNA',
     'RihanNa', 'RihanNA',
@@ -322,9 +322,9 @@ async def rihanna(ctx):
             await ctx.send(f"❌ Failed to fetch Rihanna GIFs from Tenor")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Rihanna GIF: {e}")
-
+ 
 # ==================== Utility Commands ====================
-
+ 
 @bot.command(name='serverinfo')
 async def serverinfo(ctx):
     """Display server information"""
@@ -344,7 +344,7 @@ async def serverinfo(ctx):
     embed.add_field(name="Boost Level", value=guild.premium_tier, inline=True)
     
     await ctx.send(embed=embed)
-
+ 
 @bot.command(name='userinfo')
 async def userinfo(ctx, member: discord.Member = None):
     """Display user information"""
@@ -363,7 +363,7 @@ async def userinfo(ctx, member: discord.Member = None):
     embed.add_field(name="Roles", value=len(member.roles) - 1, inline=True)
     
     await ctx.send(embed=embed)
-
+ 
 @bot.command(name='avatar')
 async def avatar(ctx, member: discord.Member = None):
     """Display user's avatar"""
@@ -376,7 +376,7 @@ async def avatar(ctx, member: discord.Member = None):
     embed.set_image(url=avatar_url)
     embed.add_field(name="Download", value=f"[Click here]({avatar_url})")
     await ctx.send(embed=embed)
-
+ 
 @bot.command(name='banner')
 async def banner(ctx, member: discord.Member = None):
     """Display user's banner or server banner"""
@@ -405,7 +405,7 @@ async def banner(ctx, member: discord.Member = None):
             await ctx.send(embed=embed)
         else:
             await ctx.send("This server doesn't have a banner.")
-
+ 
 @bot.command(name='poll')
 async def poll(ctx, question, *options):
     """Create a poll (,poll "Question" "Option 1" "Option 2")"""
@@ -432,7 +432,7 @@ async def poll(ctx, question, *options):
     
     for i in range(len(options)):
         await poll_msg.add_reaction(reactions[i])
-
+ 
 @bot.command(name='announce')
 @commands.has_permissions(manage_messages=True)
 async def announce(ctx, channel: discord.TextChannel, *, message):
@@ -445,7 +445,7 @@ async def announce(ctx, channel: discord.TextChannel, *, message):
     embed.set_footer(text=f"Announced by {ctx.author}")
     await channel.send(embed=embed)
     await ctx.send(f"Announcement sent to {channel.mention}")
-
+ 
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
     """Set yourself as AFK with a custom message"""
@@ -474,11 +474,11 @@ async def afk(ctx, *, reason="AFK"):
     embed.set_footer(text="you'll be unmarked as AFK when you send a message")
     embed.set_thumbnail(url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
     await ctx.reply(embed=embed)
-
+ 
 # ==================== Timezone Commands ====================
-
+ 
 ALL_TIMEZONES = sorted(pytz.all_timezones)
-
+ 
 @bot.tree.command(name="set_timezone", description="Set your timezone")
 @app_commands.describe(timezone="Start typing your timezone (e.g. America/New_York)")
 async def set_timezone(interaction: discord.Interaction, timezone: str):
@@ -489,13 +489,13 @@ async def set_timezone(interaction: discord.Interaction, timezone: str):
             ephemeral=True
         )
         return
-
+ 
     user_timezones[interaction.user.id] = timezone
     tz = pytz.timezone(timezone)
     now = datetime.now(tz)
     utc_offset = now.strftime('%z')
     utc_formatted = f"UTC{utc_offset[:3]}:{utc_offset[3:]}"
-
+ 
     embed = discord.Embed(
         title="🌍 Timezone Set!",
         description=f"your timezone has been saved, **{interaction.user.display_name}**",
@@ -507,18 +507,18 @@ async def set_timezone(interaction: discord.Interaction, timezone: str):
     embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else interaction.user.default_avatar.url)
     embed.set_footer(text="use ,timezone @user to check someone's time")
     await interaction.response.send_message(embed=embed)
-
+ 
 @set_timezone.autocomplete('timezone')
 async def timezone_autocomplete(interaction: discord.Interaction, current: str):
     """Autocomplete for timezone selection"""
     current_lower = current.lower()
     matches = [tz for tz in ALL_TIMEZONES if current_lower in tz.lower()][:25]
     return [app_commands.Choice(name=tz, value=tz) for tz in matches]
-
+ 
 @bot.command(name='timezone')
 async def timezone(ctx, arg: str = None, member: discord.Member = None):
     """Check your own or another user's current time, or remove your timezone"""
-
+ 
     # ,timezone remove
     if arg and arg.lower() == 'remove':
         if ctx.author.id in user_timezones:
@@ -527,7 +527,7 @@ async def timezone(ctx, arg: str = None, member: discord.Member = None):
         else:
             await ctx.reply("❌ You don't have a timezone set.")
         return
-
+ 
     # ,timezone @user — arg will be None, member will be parsed separately
     # handle: ,timezone (no args = self), ,timezone @user
     if arg is not None and member is None:
@@ -541,20 +541,20 @@ async def timezone(ctx, arg: str = None, member: discord.Member = None):
         target = member
     else:
         target = ctx.author
-
+ 
     if target.id not in user_timezones:
         if target.id == ctx.author.id:
             await ctx.reply("❌ You haven't set a timezone yet. Use `/set_timezone` to set one.")
         else:
             await ctx.reply(f"❌ **{target.display_name}** hasn't set their timezone yet.")
         return
-
+ 
     tz_str = user_timezones[target.id]
     tz = pytz.timezone(tz_str)
     now = datetime.now(tz)
     utc_offset = now.strftime('%z')
     utc_formatted = f"UTC{utc_offset[:3]}:{utc_offset[3:]}"
-
+ 
     embed = discord.Embed(
         title=f"🕐 {target.display_name}'s Time",
         color=0x3498db
@@ -566,9 +566,9 @@ async def timezone(ctx, arg: str = None, member: discord.Member = None):
     embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
     embed.set_footer(text="timezone set by the user via /set_timezone")
     await ctx.reply(embed=embed)
-
+ 
 # ==================== Tic Tac Toe ====================
-
+ 
 class TicTacToeButton(discord.ui.Button):
     def __init__(self, x: int, y: int):
         super().__init__(style=discord.ButtonStyle.secondary, label='\u200b', row=y)
@@ -626,7 +626,7 @@ class TicTacToeButton(discord.ui.Button):
             view.embed.add_field(name="Current Turn", value=f"{current_user.mention} ({current_symbol})")
         
         await interaction.response.edit_message(embed=view.embed, view=view)
-
+ 
 class TicTacToeView(discord.ui.View):
     def __init__(self, x_user: discord.Member, o_user: discord.Member):
         super().__init__(timeout=300)
@@ -672,7 +672,7 @@ class TicTacToeView(discord.ui.View):
             await self.message.edit(embed=self.embed, view=self)
         except:
             pass
-
+ 
 @bot.command(name='tictactoe')
 async def tictactoe(ctx, opponent: discord.Member):
     """Start a tic tac toe game with another player"""
@@ -686,9 +686,9 @@ async def tictactoe(ctx, opponent: discord.Member):
     
     view = TicTacToeView(ctx.author, opponent)
     view.message = await ctx.send(embed=view.embed, view=view)
-
+ 
 # ==================== Help Command ====================
-
+ 
 @bot.command(name='help')
 async def help_command(ctx):
     """Display help information"""
@@ -730,9 +730,9 @@ async def help_command(ctx):
     embed.set_footer(text="Made with 💖 | Use ,help to see this menu again")
     
     await ctx.send(embed=embed)
-
+ 
 # ==================== Error Handling ====================
-
+ 
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
@@ -745,9 +745,9 @@ async def on_command_error(ctx, error):
         await ctx.send("❌ Invalid argument provided.")
     else:
         await ctx.send(f"❌ An error occurred: {str(error)}")
-
+ 
 # ==================== Run Bot ====================
-
+ 
 TOKEN = os.getenv('DISCORD_TOKEN')
 if not TOKEN:
     print("=" * 80)
@@ -756,8 +756,9 @@ if not TOKEN:
     print(f"Files in directory: {os.listdir('.')}")
     print("=" * 80)
     exit(1)
-
+ 
 print(f"✓ Token loaded successfully (starts with: {TOKEN[:20]}...)")
-
+ 
 if __name__ == "__main__":
     bot.run(TOKEN)
+ 
