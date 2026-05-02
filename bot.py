@@ -408,6 +408,142 @@ async def frankocean(ctx):
     except Exception as e:
         await ctx.send(f"❌ Failed to send Frank Ocean GIF: {e}")
  
+async def fetch_future_gifs():
+    """Fetch random Future the rapper GIFs from Tenor API"""
+    random_pos = random.randint(0, 100)
+ 
+    params = {
+        "q": "future rapper",
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)
+    }
+ 
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gifs = []
+                    for result in data.get('results', []):
+                        title = result.get('title', '').lower()
+                        tags = [tag.lower() for tag in result.get('tags', [])]
+                        combined = title + ' ' + ' '.join(tags)
+                        if 'future' in combined and ('rapper' in combined or 'hip hop' in combined or 'trap' in combined or 'hendrix' in combined or 'pluto' in combined):
+                            gifs.append(result['media_formats']['gif']['url'])
+                    if not gifs:
+                        gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
+ 
+@bot.command(name='future', aliases=[
+    'Future', 'FUTURE',
+    'fUture', 'fUTure', 'fUTUre', 'fUTURe', 'fUTURE',
+    'fuTure', 'fuTUre', 'fuTURe', 'fuTURE',
+    'futUre', 'futURe', 'futURE',
+    'futuRe', 'futuRE',
+    'futurE',
+    'FUture', 'FUTure', 'FUTUre', 'FUTURe',
+    'FuTure', 'FuTUre', 'FuTURe', 'FuTURE',
+    'FutUre', 'FutURe', 'FutURE',
+    'FutuRe',
+    'FuturE',
+    'FUTuRe', 'FUTuRE', 'FUTurE',
+    'FUtuRe', 'FUtuRE', 'FUturE',
+])
+async def future(ctx):
+    """Send a random Future the rapper GIF from Tenor"""
+    try:
+        gifs = await fetch_future_gifs()
+ 
+        if gifs:
+            random_gif = random.choice(gifs)
+ 
+            embed = discord.Embed(
+                color=discord.Color.gold()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+ 
+            await ctx.reply(embed=embed, mention_author=False)
+        else:
+            await ctx.send(f"❌ Failed to fetch Future GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Future GIF: {e}")
+ 
+async def fetch_manon_gifs():
+    """Fetch random Manon the singer GIFs from Tenor API"""
+    random_pos = random.randint(0, 100)
+ 
+    params = {
+        "q": "manon singer",
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)
+    }
+ 
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gifs = []
+                    for result in data.get('results', []):
+                        title = result.get('title', '').lower()
+                        tags = [tag.lower() for tag in result.get('tags', [])]
+                        combined = title + ' ' + ' '.join(tags)
+                        if 'manon' in combined and ('singer' in combined or 'music' in combined or 'song' in combined or 'performance' in combined):
+                            gifs.append(result['media_formats']['gif']['url'])
+                    if not gifs:
+                        gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
+ 
+@bot.command(name='manon', aliases=[
+    'Manon', 'MANON',
+    'mAnon', 'mANon', 'mANOn', 'mANON',
+    'maNon', 'maNOn', 'maNON',
+    'manOn', 'manON',
+    'manoN',
+    'MAnon', 'MANon', 'MANOn',
+    'MaNon', 'MaNOn', 'MaNON',
+    'ManOn', 'ManON',
+    'ManoN',
+    'MAnOn', 'MAnON', 'MaNoN',
+    'mANoN', 'mAnOn', 'mAnON', 'mAnoN',
+])
+async def manon(ctx):
+    """Send a random Manon the singer GIF from Tenor"""
+    try:
+        gifs = await fetch_manon_gifs()
+ 
+        if gifs:
+            random_gif = random.choice(gifs)
+ 
+            embed = discord.Embed(
+                color=discord.Color.gold()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+ 
+            await ctx.reply(embed=embed, mention_author=False)
+        else:
+            await ctx.send(f"❌ Failed to fetch Manon GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Manon GIF: {e}")
+ 
 # ==================== Utility Commands ====================
  
 @bot.command(name='serverinfo')
@@ -790,6 +926,8 @@ async def help_command(ctx):
             "`beyonce` - Random Beyonce GIF\n"
             "`rihanna` - Random Rihanna GIF\n"
             "`frankocean` - Random Frank Ocean GIF\n"
+            "`future` - Random Future the Rapper GIF\n"
+            "`manon` - Random Manon the Singer GIF\n"
             "`tictactoe @user` - Play tic-tac-toe\n"
             "`cussout @user` - Cuss out user (owner only)"
         ),
