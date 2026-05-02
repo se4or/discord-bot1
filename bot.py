@@ -8,6 +8,7 @@ import os
 from dotenv import load_dotenv
 import random
 import aiohttp
+import pytz
 
 # Load environment variables
 load_dotenv()
@@ -24,10 +25,11 @@ if not os.getenv('DISCORD_TOKEN'):
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=',', intents=intents, help_command=None)
 
-# Storage for warnings, mutes, and AFK users (in production, use a database)
-warnings = {}
-muted_users = {}
+# Storage for AFK users
 afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
+
+# Storage for user timezones
+user_timezones = {}  # {user_id: 'timezone_string'}
 
 # Tenor API configuration
 TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # Public Tenor API key
@@ -139,7 +141,7 @@ async def on_message(message):
         del afk_users[message.author.id]
         
         welcome_msg = await message.channel.send(f"{message.author.mention} BITCH IM BACK OUTTA MY COMA")
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)
         try:
             await welcome_msg.delete()
         except:
@@ -151,9 +153,9 @@ async def on_message(message):
     for mentioned_user in message.mentions:
         if mentioned_user.id in afk_users:
             afk_data = afk_users[mentioned_user.id]
+            display_name = mentioned_user.nick or mentioned_user.name
             await message.reply(
-                f"💤 {mentioned_user.mention} is currently AFK: {afk_data['reason']}",
-                delete_after=5
+                f"💤 **{display_name}** is currently AFK: {afk_data['reason']}"
             )
     
     if not message.content.startswith(','):
@@ -180,288 +182,6 @@ async def on_message(message):
 async def after_any_command(ctx):
     """This runs after every command"""
     print(f"[AFTER_INVOKE] Command: {ctx.command.name} | User: {ctx.author} | Message ID: {ctx.message.id}")
-
-# ==================== Moderation Commands ====================
-
-@bot.command(name='ban')
-@commands.has_permissions(ban_members=True)
-async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Ban a member from the server"""
-    try:
-        await member.ban(reason=reason)
-        embed = discord.Embed(
-            title="HA good riddance bitch",
-            description=f"{member.mention} got the boot",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Reason", value=reason)
-        embed.add_field(name="Moderator", value=ctx.author.mention)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"Failed to ban member: {e}")
-
-@bot.command(name='unban')
-@commands.has_permissions(ban_members=True)
-async def unban(ctx, user_id: int, *, reason="No reason provided"):
-    """Unban a user by ID"""
-    try:
-        user = await bot.fetch_user(user_id)
-        await ctx.guild.unban(user, reason=reason)
-        await ctx.send(f"Unbanned {user.name}")
-    except Exception as e:
-        await ctx.send(f"Failed to unban user: {e}")
-
-@bot.command(name='kick')
-@commands.has_permissions(kick_members=True)
-async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Kick a member from the server"""
-    try:
-        await member.kick(reason=reason)
-        embed = discord.Embed(
-            title="Member Kicked",
-            description=f"{member.mention} has been kicked",
-            color=discord.Color.orange()
-        )
-        embed.add_field(name="Reason", value=reason)
-        embed.add_field(name="Moderator", value=ctx.author.mention)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"Failed to kick member: {e}")
-
-@bot.command(name='mute')
-@commands.has_permissions(moderate_members=True)
-async def mute(ctx, member: discord.Member, duration: str = None, *, reason="No reason provided"):
-    """Mute a member (e.g., ,mute @user 10m reason)"""
-    try:
-        time_dict = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
-        if duration:
-            time_value = int(duration[:-1])
-            time_unit = duration[-1]
-            seconds = time_value * time_dict.get(time_unit, 60)
-            until = discord.utils.utcnow() + timedelta(seconds=seconds)
-        else:
-            until = discord.utils.utcnow() + timedelta(days=28)
-        
-        await member.timeout(until, reason=reason)
-        
-        embed = discord.Embed(
-            title="get muted ho",
-            description=f"{member.mention} shut your mouth",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="Duration", value=duration or "28 days")
-        embed.add_field(name="Reason", value=reason)
-        embed.add_field(name="Moderator", value=ctx.author.mention)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"Failed to mute member: {e}")
-
-@bot.command(name='unmute')
-@commands.has_permissions(moderate_members=True)
-async def unmute(ctx, member: discord.Member):
-    """Unmute a member"""
-    try:
-        await member.timeout(None)
-        await ctx.send(f"{member.mention} has been unmuted.")
-    except Exception as e:
-        await ctx.send(f"Failed to unmute member: {e}")
-
-@bot.command(name='warn')
-@commands.has_permissions(manage_messages=True)
-async def warn(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Warn a member"""
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
-    
-    if guild_id not in warnings:
-        warnings[guild_id] = {}
-    if user_id not in warnings[guild_id]:
-        warnings[guild_id][user_id] = []
-    
-    warning = {
-        'reason': reason,
-        'moderator': str(ctx.author),
-        'timestamp': datetime.now().isoformat()
-    }
-    warnings[guild_id][user_id].append(warning)
-    
-    warn_count = len(warnings[guild_id][user_id])
-    
-    embed = discord.Embed(
-        title="the fucknigga has been warned",
-        description=f"{member.mention} got their warning",
-        color=discord.Color.yellow()
-    )
-    embed.add_field(name="Reason", value=reason)
-    embed.add_field(name="Total Warnings", value=str(warn_count))
-    embed.add_field(name="Moderator", value=ctx.author.mention)
-    await ctx.send(embed=embed)
-    
-    try:
-        await member.send(f"You have been warned in {ctx.guild.name} for: {reason}")
-    except:
-        pass
-
-@bot.command(name='warnings')
-@commands.has_permissions(manage_messages=True)
-async def view_warnings(ctx, member: discord.Member):
-    """View warnings for a member"""
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
-    
-    if guild_id not in warnings or user_id not in warnings[guild_id]:
-        await ctx.send(f"{member.mention} has no warnings.")
-        return
-    
-    user_warnings = warnings[guild_id][user_id]
-    embed = discord.Embed(
-        title=f"Warnings for {member.name}",
-        color=discord.Color.yellow()
-    )
-    
-    for i, warning in enumerate(user_warnings, 1):
-        embed.add_field(
-            name=f"Warning {i}",
-            value=f"**Reason:** {warning['reason']}\n**Moderator:** {warning['moderator']}\n**Date:** {warning['timestamp'][:10]}",
-            inline=False
-        )
-    
-    await ctx.send(embed=embed)
-
-@bot.command(name='clearwarns')
-@commands.has_permissions(manage_messages=True)
-async def clear_warnings(ctx, member: discord.Member):
-    """Clear all warnings for a member"""
-    guild_id = str(ctx.guild.id)
-    user_id = str(member.id)
-    
-    if guild_id in warnings and user_id in warnings[guild_id]:
-        warnings[guild_id][user_id] = []
-        await ctx.send(f"Cleared all warnings for {member.mention}")
-    else:
-        await ctx.send(f"{member.mention} has no warnings to clear.")
-
-@bot.command(name='purge')
-@commands.has_permissions(manage_messages=True)
-async def purge(ctx, amount: int = None, member: discord.Member = None):
-    """Delete messages - usage: ,purge <amount> or ,purge <amount> @user"""
-    if amount is None:
-        await ctx.send("❌ Usage: `,purge <amount>` or `,purge <amount> @user`")
-        return
-    
-    if amount > 100:
-        await ctx.send("Cannot delete more than 100 messages at once.")
-        return
-    
-    if amount < 1:
-        await ctx.send("Amount must be at least 1.")
-        return
-    
-    try:
-        if member:
-            def check(m):
-                return m.author.id == member.id
-            
-            deleted = await ctx.channel.purge(limit=100, check=check)
-            deleted = deleted[:amount]
-            msg = await ctx.send(f"Deleted {len(deleted)} messages from {member.mention}.")
-        else:
-            deleted = await ctx.channel.purge(limit=amount + 1)
-            msg = await ctx.send(f"Deleted {len(deleted) - 1} messages.")
-        
-        await asyncio.sleep(3)
-        await msg.delete()
-    except Exception as e:
-        await ctx.send(f"Failed to purge messages: {e}")
-
-@bot.command(name='lock')
-@commands.has_permissions(manage_channels=True)
-async def lock(ctx):
-    """Lock the current channel"""
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=False)
-    await ctx.send(f"🔒 {ctx.channel.mention} has been locked.")
-
-@bot.command(name='unlock')
-@commands.has_permissions(manage_channels=True)
-async def unlock(ctx):
-    """Unlock the current channel"""
-    await ctx.channel.set_permissions(ctx.guild.default_role, send_messages=True)
-    await ctx.send(f"🔓 {ctx.channel.mention} has been unlocked.")
-
-@bot.command(name='slowmode')
-@commands.has_permissions(manage_channels=True)
-async def slowmode(ctx, seconds: int):
-    """Set slowmode for the channel"""
-    await ctx.channel.edit(slowmode_delay=seconds)
-    await ctx.send(f"Slowmode set to {seconds} seconds.")
-
-# ==================== Role Management ====================
-
-@bot.command(name='addrole')
-@commands.has_permissions(manage_roles=True)
-async def addrole(ctx, member: discord.Member, *, role: discord.Role):
-    """Give a role to a member"""
-    try:
-        await member.add_roles(role)
-        embed = discord.Embed(
-            title="here's your role mf",
-            description=f"{member.mention} got {role.mention}",
-            color=discord.Color.green()
-        )
-        embed.add_field(name="Moderator", value=ctx.author.mention)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"Failed to add role: {e}")
-
-@bot.command(name='removerole')
-@commands.has_permissions(manage_roles=True)
-async def removerole(ctx, member: discord.Member, *, role: discord.Role):
-    """Remove a role from a member"""
-    try:
-        await member.remove_roles(role)
-        embed = discord.Embed(
-            title="gimme that shit cry me a river",
-            description=f"Took {role.mention} from {member.mention}",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Moderator", value=ctx.author.mention)
-        await ctx.send(embed=embed)
-    except Exception as e:
-        await ctx.send(f"Failed to remove role: {e}")
-
-@bot.command(name='roleinfo')
-async def roleinfo(ctx, *, role: discord.Role):
-    """Display information about a role"""
-    embed = discord.Embed(
-        title=f"Role Info: {role.name}",
-        color=role.color
-    )
-    embed.add_field(name="ID", value=role.id, inline=True)
-    embed.add_field(name="Color", value=str(role.color), inline=True)
-    embed.add_field(name="Members", value=len(role.members), inline=True)
-    embed.add_field(name="Mentionable", value="Yes" if role.mentionable else "No", inline=True)
-    embed.add_field(name="Hoisted", value="Yes" if role.hoist else "No", inline=True)
-    embed.add_field(name="Position", value=role.position, inline=True)
-    embed.add_field(name="Created", value=role.created_at.strftime("%Y-%m-%d"), inline=True)
-    await ctx.send(embed=embed)
-
-@bot.command(name='roles')
-async def roles(ctx, member: discord.Member = None):
-    """List all roles of a member"""
-    member = member or ctx.author
-    roles = [role.mention for role in member.roles if role.name != "@everyone"]
-    
-    if not roles:
-        await ctx.send(f"{member.mention} has no roles.")
-        return
-    
-    embed = discord.Embed(
-        title=f"Roles for {member.name}",
-        description=", ".join(roles),
-        color=member.color
-    )
-    embed.set_footer(text=f"Total roles: {len(roles)}")
-    await ctx.send(embed=embed)
 
 # ==================== Fun Commands ====================
 
@@ -532,128 +252,76 @@ async def beyonce(ctx):
     except Exception as e:
         await ctx.send(f"❌ Failed to send Beyonce GIF: {e}")
 
-def hex_to_color(hex_code):
-    """Convert hex code to discord.Color"""
-    hex_code = hex_code.strip('#')
-    return discord.Color(int(hex_code, 16))
-
-@bot.command(name='rolecolor')
-async def rolecolor(ctx):
-    """Create a custom colored role with your username"""
-    await ctx.send(f"{ctx.author.mention} Please provide a hex color code (e.g., #FF5733 or FF5733):")
+async def fetch_rihanna_gifs():
+    """Fetch random Rihanna GIFs from Tenor API"""
+    random_pos = random.randint(0, 100)
     
-    def check(m):
-        return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+    search_queries = [
+        "rihanna",
+        "rihanna dance",
+        "rihanna performance",
+        "rihanna singer",
+        "rihanna slay"
+    ]
     
-    try:
-        hex_msg = await bot.wait_for('message', check=check, timeout=60.0)
-        hex_code = hex_msg.content.strip()
-        
-        try:
-            color = hex_to_color(hex_code)
-        except ValueError:
-            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
-            return
-        
-        user_roles = [role for role in ctx.author.roles if role.name != "@everyone"]
-        highest_role = max(user_roles, key=lambda r: r.position) if user_roles else None
-        
-        role_name = ctx.author.name
-        new_role = await ctx.guild.create_role(
-            name=role_name,
-            color=color,
-            reason=f"Custom color role for {ctx.author}"
-        )
-        
-        if highest_role:
-            try:
-                await new_role.edit(position=highest_role.position + 1)
-            except discord.Forbidden:
-                await ctx.send("⚠️ Role created but couldn't move it above your highest role. Bot role might be too low.")
-        
-        await ctx.author.add_roles(new_role)
-        
-        embed = discord.Embed(
-            title="✨ Custom Role Created!",
-            description=f"Role **{role_name}** has been created with your custom color!",
-            color=color
-        )
-        embed.add_field(name="Hex Code", value=hex_code.upper())
-        embed.set_footer(text=f"Created for {ctx.author}")
-        await ctx.send(embed=embed)
-        
-    except asyncio.TimeoutError:
-        await ctx.send("❌ Timeout! You took too long to respond.")
-
-@bot.command(name='gradientrole')
-async def gradientrole(ctx):
-    """Create a gradient colored role"""
-    await ctx.send(f"{ctx.author.mention} Please provide the FIRST hex color code (e.g., #FF5733):")
+    search_query = random.choice(search_queries)
     
-    def check(m):
-        return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+    params = {
+        "q": search_query,
+        "key": TENOR_API_KEY,
+        "client_key": "discord_bot",
+        "limit": 50,
+        "pos": str(random_pos)
+    }
     
     try:
-        hex_msg1 = await bot.wait_for('message', check=check, timeout=60.0)
-        hex_code1 = hex_msg1.content.strip()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(TENOR_SEARCH_URL, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    return gifs if gifs else None
+                else:
+                    print(f"Tenor API returned status {response.status}")
+                    return None
+    except Exception as e:
+        print(f"Error fetching GIFs from Tenor: {e}")
+        return None
+
+@bot.command(name='rihanna', aliases=[
+    'Rihanna', 'RIHANNA',
+    'rIhanna', 'rIHanna', 'rIHAnna', 'rIHANna', 'rIHANNa', 'rIHANNA',
+    'riHanna', 'riHAnna', 'riHANna', 'riHANNa', 'riHANNA',
+    'rihAnna', 'rihANna', 'rihANNa', 'rihANNA',
+    'rihaNna', 'rihaNNa', 'rihaNNA',
+    'rihanNa', 'rihanNA',
+    'rihannA',
+    'Rihanna', 'RIhanna', 'RIHanna', 'RIHAnna', 'RIHANna', 'RIHANNa',
+    'rIhanna', 'RiHanna', 'RiHAnna', 'RiHANna', 'RiHANNa', 'RiHANNA',
+    'RihAnna', 'RihANna', 'RihANNa', 'RihANNA',
+    'RihaNna', 'RihaNNa', 'RihaNNA',
+    'RihanNa', 'RihanNA',
+    'RihannA'
+])
+async def rihanna(ctx):
+    """Send a random Rihanna GIF from Tenor"""
+    try:
+        gifs = await fetch_rihanna_gifs()
         
-        try:
-            color1 = hex_to_color(hex_code1)
-        except ValueError:
-            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
-            return
-        
-        await ctx.send(f"{ctx.author.mention} Now provide the SECOND hex color code:")
-        
-        hex_msg2 = await bot.wait_for('message', check=check, timeout=60.0)
-        hex_code2 = hex_msg2.content.strip()
-        
-        try:
-            color2 = hex_to_color(hex_code2)
-        except ValueError:
-            await ctx.send("❌ Invalid hex code! Please use format like #FF5733 or FF5733")
-            return
-        
-        r1, g1, b1 = color1.r, color1.g, color1.b
-        r2, g2, b2 = color2.r, color2.g, color2.b
-        
-        mid_r = (r1 + r2) // 2
-        mid_g = (g1 + g2) // 2
-        mid_b = (b1 + b2) // 2
-        
-        gradient_color = discord.Color.from_rgb(mid_r, mid_g, mid_b)
-        
-        user_roles = [role for role in ctx.author.roles if role.name != "@everyone"]
-        highest_role = max(user_roles, key=lambda r: r.position) if user_roles else None
-        
-        role_name = ctx.author.name
-        new_role = await ctx.guild.create_role(
-            name=role_name,
-            color=gradient_color,
-            reason=f"Gradient color role for {ctx.author}"
-        )
-        
-        if highest_role:
-            try:
-                await new_role.edit(position=highest_role.position + 1)
-            except discord.Forbidden:
-                await ctx.send("⚠️ Role created but couldn't move it above your highest role. Bot role might be too low.")
-        
-        await ctx.author.add_roles(new_role)
-        
-        embed = discord.Embed(
-            title="🌈 Gradient Role Created!",
-            description=f"Role **{role_name}** has been created with a gradient color!",
-            color=gradient_color
-        )
-        embed.add_field(name="Color 1", value=hex_code1.upper(), inline=True)
-        embed.add_field(name="Color 2", value=hex_code2.upper(), inline=True)
-        embed.add_field(name="Result", value=f"#{mid_r:02x}{mid_g:02x}{mid_b:02x}".upper(), inline=True)
-        embed.set_footer(text=f"Created for {ctx.author} | Note: Discord shows the middle gradient color")
-        await ctx.send(embed=embed)
-        
-    except asyncio.TimeoutError:
-        await ctx.send("❌ Timeout! You took too long to respond.")
+        if gifs:
+            random_gif = random.choice(gifs)
+            
+            embed = discord.Embed(
+                color=discord.Color.gold()
+            )
+            embed.set_image(url=random_gif)
+            embed.set_footer(text=f"Requested by {ctx.author.name}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+            
+            await ctx.reply(embed=embed, mention_author=False)
+        else:
+            await ctx.send(f"❌ Failed to fetch Rihanna GIFs from Tenor")
+    except Exception as e:
+        await ctx.send(f"❌ Failed to send Rihanna GIF: {e}")
 
 # ==================== Utility Commands ====================
 
@@ -798,11 +466,105 @@ async def afk(ctx, *, reason="AFK"):
     }
     
     embed = discord.Embed(
-        title="💤 AFK Status Set",
-        description=f"{ctx.author.mention} is now AFK",
-        color=discord.Color.greyple()
+        title="you're now AFK 💤",
+        description=f"see you later **{ctx.author.display_name}** 👋",
+        color=0x9b59b6
     )
-    embed.add_field(name="Reason", value=reason)
+    embed.add_field(name="📝 Reason", value=f"> {reason}", inline=False)
+    embed.set_footer(text="you'll be unmarked as AFK when you send a message")
+    embed.set_thumbnail(url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
+    await ctx.reply(embed=embed)
+
+# ==================== Timezone Commands ====================
+
+ALL_TIMEZONES = sorted(pytz.all_timezones)
+
+@bot.tree.command(name="set_timezone", description="Set your timezone")
+@app_commands.describe(timezone="Start typing your timezone (e.g. America/New_York)")
+async def set_timezone(interaction: discord.Interaction, timezone: str):
+    """Set your timezone via slash command with autocomplete"""
+    if timezone not in pytz.all_timezones:
+        await interaction.response.send_message(
+            "❌ Invalid timezone. Please pick one from the autocomplete list.",
+            ephemeral=True
+        )
+        return
+
+    user_timezones[interaction.user.id] = timezone
+    tz = pytz.timezone(timezone)
+    now = datetime.now(tz)
+    utc_offset = now.strftime('%z')
+    utc_formatted = f"UTC{utc_offset[:3]}:{utc_offset[3:]}"
+
+    embed = discord.Embed(
+        title="🌍 Timezone Set!",
+        description=f"your timezone has been saved, **{interaction.user.display_name}**",
+        color=0x2ecc71
+    )
+    embed.add_field(name="🕐 Timezone", value=f"`{timezone}`", inline=True)
+    embed.add_field(name="🔢 UTC Offset", value=f"`{utc_formatted}`", inline=True)
+    embed.add_field(name="🕰️ Your Current Time", value=f"`{now.strftime('%A, %B %d %Y • %I:%M %p')}`", inline=False)
+    embed.set_thumbnail(url=interaction.user.avatar.url if interaction.user.avatar else interaction.user.default_avatar.url)
+    embed.set_footer(text="use ,timezone @user to check someone's time")
+    await interaction.response.send_message(embed=embed)
+
+@set_timezone.autocomplete('timezone')
+async def timezone_autocomplete(interaction: discord.Interaction, current: str):
+    """Autocomplete for timezone selection"""
+    current_lower = current.lower()
+    matches = [tz for tz in ALL_TIMEZONES if current_lower in tz.lower()][:25]
+    return [app_commands.Choice(name=tz, value=tz) for tz in matches]
+
+@bot.command(name='timezone')
+async def timezone(ctx, arg: str = None, member: discord.Member = None):
+    """Check your own or another user's current time, or remove your timezone"""
+
+    # ,timezone remove
+    if arg and arg.lower() == 'remove':
+        if ctx.author.id in user_timezones:
+            del user_timezones[ctx.author.id]
+            await ctx.reply("✅ Your timezone has been removed.")
+        else:
+            await ctx.reply("❌ You don't have a timezone set.")
+        return
+
+    # ,timezone @user — arg will be None, member will be parsed separately
+    # handle: ,timezone (no args = self), ,timezone @user
+    if arg is not None and member is None:
+        # arg might be a mention that didn't resolve, try converting
+        try:
+            target_id = int(arg.strip('<@!>'))
+            target = ctx.guild.get_member(target_id) or ctx.author
+        except:
+            target = ctx.author
+    elif member is not None:
+        target = member
+    else:
+        target = ctx.author
+
+    if target.id not in user_timezones:
+        if target.id == ctx.author.id:
+            await ctx.reply("❌ You haven't set a timezone yet. Use `/set_timezone` to set one.")
+        else:
+            await ctx.reply(f"❌ **{target.display_name}** hasn't set their timezone yet.")
+        return
+
+    tz_str = user_timezones[target.id]
+    tz = pytz.timezone(tz_str)
+    now = datetime.now(tz)
+    utc_offset = now.strftime('%z')
+    utc_formatted = f"UTC{utc_offset[:3]}:{utc_offset[3:]}"
+
+    embed = discord.Embed(
+        title=f"🕐 {target.display_name}'s Time",
+        color=0x3498db
+    )
+    embed.add_field(name="🗓️ Date", value=f"`{now.strftime('%A, %B %d %Y')}`", inline=False)
+    embed.add_field(name="🕰️ Time", value=f"`{now.strftime('%I:%M %p')}`", inline=True)
+    embed.add_field(name="🌍 Timezone", value=f"`{tz_str}`", inline=True)
+    embed.add_field(name="🔢 UTC Offset", value=f"`{utc_formatted}`", inline=True)
+    embed.set_thumbnail(url=target.avatar.url if target.avatar else target.default_avatar.url)
+    embed.set_footer(text="timezone set by the user via /set_timezone")
     await ctx.reply(embed=embed)
 
 # ==================== Tic Tac Toe ====================
@@ -931,39 +693,9 @@ async def tictactoe(ctx, opponent: discord.Member):
 async def help_command(ctx):
     """Display help information"""
     embed = discord.Embed(
-        title="🤖 Test1 Bot Commands",
+        title="🤖 Bot Commands",
         description="Prefix: `,`\nUse `,command` to run a command",
         color=discord.Color.blue()
-    )
-    
-    embed.add_field(
-        name="⚖️ Moderation",
-        value=(
-            "`ban @user [reason]` - Ban a member\n"
-            "`unban <user_id> [reason]` - Unban a user\n"
-            "`kick @user [reason]` - Kick a member\n"
-            "`mute @user [duration] [reason]` - Mute a member\n"
-            "`unmute @user` - Unmute a member\n"
-            "`warn @user [reason]` - Warn a member\n"
-            "`warnings @user` - View warnings\n"
-            "`clearwarns @user` - Clear warnings\n"
-            "`purge <amount>` - Delete messages\n"
-            "`lock` - Lock channel\n"
-            "`unlock` - Unlock channel\n"
-            "`slowmode <seconds>` - Set slowmode"
-        ),
-        inline=False
-    )
-    
-    embed.add_field(
-        name="👑 Role Management",
-        value=(
-            "`addrole @user @role` - Give a role\n"
-            "`removerole @user @role` - Remove a role\n"
-            "`roleinfo @role` - Role information\n"
-            "`roles [@user]` - List user's roles"
-        ),
-        inline=False
     )
     
     embed.add_field(
@@ -971,8 +703,7 @@ async def help_command(ctx):
         value=(
             "`lexi` - Random Hello Kitty GIF\n"
             "`beyonce` - Random Beyonce GIF\n"
-            "`rolecolor` - Create custom colored role\n"
-            "`gradientrole` - Create gradient colored role\n"
+            "`rihanna` - Random Rihanna GIF\n"
             "`tictactoe @user` - Play tic-tac-toe\n"
             "`cussout @user` - Cuss out user (owner only)"
         ),
@@ -988,7 +719,10 @@ async def help_command(ctx):
             "`banner [@user]` - Show banner\n"
             "`poll \"question\" \"opt1\" \"opt2\"` - Create poll\n"
             "`announce #channel <message>` - Send announcement\n"
-            "`afk [reason]` - Set AFK status"
+            "`afk [reason]` - Set AFK status\n"
+            "`timezone [@user]` - Check your or someone's current time\n"
+            "`timezone remove` - Remove your saved timezone\n"
+            "`/set_timezone` - Set your timezone (with autocomplete)"
         ),
         inline=False
     )
