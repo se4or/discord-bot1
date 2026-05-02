@@ -328,11 +328,14 @@ async def fetch_frankocean_gifs():
     random_pos = random.randint(0, 100)
     
     search_queries = [
-        "frank ocean",
         "frank ocean singer",
-        "frank ocean performance",
-        "frank ocean blond",
-        "frank ocean channel orange"
+        "frank ocean rapper",
+        "frank ocean blonde",
+        "frank ocean channel orange",
+        "frank ocean RnB",
+        "frank ocean music",
+        "frank ocean coachella",
+        "frank ocean grammy"
     ]
     
     search_query = random.choice(search_queries)
