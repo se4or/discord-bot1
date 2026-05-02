@@ -412,8 +412,18 @@ async def fetch_future_gifs():
     """Fetch random Future the rapper GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
  
+    search_queries = [
+        "future rapper",
+        "future hendrix",
+        "future pluto rapper",
+        "future trap rapper",
+        "future hip hop",
+    ]
+ 
+    search_query = random.choice(search_queries)
+ 
     params = {
-        "q": "future rapper",
+        "q": search_query,
         "key": TENOR_API_KEY,
         "client_key": "discord_bot",
         "limit": 50,
@@ -425,15 +435,7 @@ async def fetch_future_gifs():
             async with session.get(TENOR_SEARCH_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    gifs = []
-                    for result in data.get('results', []):
-                        title = result.get('title', '').lower()
-                        tags = [tag.lower() for tag in result.get('tags', [])]
-                        combined = title + ' ' + ' '.join(tags)
-                        if 'future' in combined and ('rapper' in combined or 'hip hop' in combined or 'trap' in combined or 'hendrix' in combined or 'pluto' in combined):
-                            gifs.append(result['media_formats']['gif']['url'])
-                    if not gifs:
-                        gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
                     return gifs if gifs else None
                 else:
                     print(f"Tenor API returned status {response.status}")
@@ -481,8 +483,18 @@ async def fetch_manon_gifs():
     """Fetch random Manon the singer GIFs from Tenor API"""
     random_pos = random.randint(0, 100)
  
+    search_queries = [
+        "manon singer",
+        "manon music",
+        "manon performance",
+        "manon pop singer",
+        "manon artist",
+    ]
+ 
+    search_query = random.choice(search_queries)
+ 
     params = {
-        "q": "manon singer",
+        "q": search_query,
         "key": TENOR_API_KEY,
         "client_key": "discord_bot",
         "limit": 50,
@@ -494,15 +506,7 @@ async def fetch_manon_gifs():
             async with session.get(TENOR_SEARCH_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    gifs = []
-                    for result in data.get('results', []):
-                        title = result.get('title', '').lower()
-                        tags = [tag.lower() for tag in result.get('tags', [])]
-                        combined = title + ' ' + ' '.join(tags)
-                        if 'manon' in combined and ('singer' in combined or 'music' in combined or 'song' in combined or 'performance' in combined):
-                            gifs.append(result['media_formats']['gif']['url'])
-                    if not gifs:
-                        gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
+                    gifs = [result['media_formats']['gif']['url'] for result in data.get('results', [])]
                     return gifs if gifs else None
                 else:
                     print(f"Tenor API returned status {response.status}")
