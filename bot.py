@@ -360,21 +360,19 @@ async def fetch_frankocean_gifs():
         return None
  
 @bot.command(name='frankocean', aliases=[
-    # with space variations
     'frank ocean', 'Frank Ocean', 'FRANK OCEAN', 'Frank ocean', 'frank Ocean',
     'FRANK ocean', 'frank OCEAN', 'Frank OCEAN', 'FRANK Ocean',
-    # no space all caps combos
     'Frankocean', 'FRANKOCEAN',
     'fRankocean', 'fRAnkocean', 'fRANkocean', 'fRANKocean', 'fRANKOcean', 'fRANKOCean', 'fRANKOCEan', 'fRANKOCEAn', 'fRANKOCEAN',
     'frAnkocean', 'frANkocean', 'frANKocean', 'frANKOcean', 'frANKOCean', 'frANKOCEan', 'frANKOCEAn', 'frANKOCEAN',
     'fraNkocean', 'fraNKocean', 'fraNKOcean', 'fraNKOCean', 'fraNKOCEan', 'fraNKOCEAn', 'fraNKOCEAN',
     'frankOcean', 'frankOCean', 'frankOCEan', 'frankOCEAn', 'frankOCEAN',
-    'frankoOcean', 'frankoCean', 'frankoOcean', 'frankocEan', 'frankocEAn', 'frankocEAN',
-    'frankoceAn', 'frankoceAN', 'frankocean',
+    'frankoCean', 'frankocEan', 'frankocEAn', 'frankocEAN',
+    'frankoceAn', 'frankoceAN',
     'FrAnkocean', 'FrANkocean', 'FrANKocean', 'FrANKOcean', 'FrANKOCean', 'FrANKOCEan', 'FrANKOCEAn', 'FrANKOCEAN',
     'FraNkocean', 'FraNKocean', 'FraNKOcean', 'FraNKOCean', 'FraNKOCEan', 'FraNKOCEAn', 'FraNKOCEAN',
     'FrankOcean', 'FrankOCean', 'FrankOCEan', 'FrankOCEAn', 'FrankOCEAN',
-    'FrankoOcean', 'FrankoCean', 'FrankoOcean', 'FrankocEan', 'FrankocEAn', 'FrankocEAN',
+    'FrankoCean', 'FrankocEan', 'FrankocEAn', 'FrankocEAN',
     'FrankoceAn', 'FrankoceAN',
     'FRANkocean', 'FRANKocean', 'FRANKOcean', 'FRANKOCean', 'FRANKOCEan', 'FRANKOCEAn', 'FRANKoCean',
 ])
