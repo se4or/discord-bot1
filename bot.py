@@ -42,9 +42,10 @@ KLIPY_SEARCH_URL_TEMPLATE = "https://api.klipy.com/api/v1/{key}/gifs/search"
 
 
 async def fetch_giphy_gifs(query, limit=25):
-    """Fetch GIFs matching `query` from the Giphy API."""
+    """Fetch GIFs matching `query` from the Giphy API.
+    Returns a list of (url, title) tuples so results can be filtered by name."""
     if not GIPHY_API_KEY:
-        return None
+        return []
 
     offset = random.randint(0, 50)
     params = {
@@ -61,24 +62,26 @@ async def fetch_giphy_gifs(query, limit=25):
             async with session.get(GIPHY_SEARCH_URL, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
-                    gifs = [
-                        result['images']['original']['url']
-                        for result in data.get('data', [])
-                        if result.get('images', {}).get('original', {}).get('url')
-                    ]
-                    return gifs if gifs else None
+                    results = []
+                    for result in data.get('data', []):
+                        url = result.get('images', {}).get('original', {}).get('url')
+                        if url:
+                            title = result.get('title', '') or ''
+                            results.append((url, title))
+                    return results
                 else:
                     print(f"Giphy API returned status {response.status}")
-                    return None
+                    return []
     except Exception as e:
         print(f"Error fetching GIFs from Giphy: {e}")
-        return None
+        return []
 
 
-def _extract_klipy_url(item):
-    """Best-effort extraction of a usable GIF URL from a Klipy result item.
-    Klipy's response shape nests quality tiers (hd/md/sm/xs) under a 'file'
-    (sometimes 'files') key. This tries the known shapes defensively."""
+def _extract_klipy_url_and_title(item):
+    """Best-effort extraction of a usable GIF URL (and title) from a Klipy
+    result item. Klipy's response shape nests quality tiers (hd/md/sm/xs)
+    under a 'file' (sometimes 'files') key. This tries known shapes defensively."""
+    title = item.get('title', '') or item.get('slug', '') or ''
     file_obj = item.get('file') or item.get('files') or {}
 
     if isinstance(file_obj, dict):
@@ -88,24 +91,24 @@ def _extract_klipy_url(item):
                 for fmt in ('gif', 'webp', 'mp4'):
                     fmt_data = tier.get(fmt)
                     if isinstance(fmt_data, dict) and fmt_data.get('url'):
-                        return fmt_data['url']
-                # tier itself might directly hold a url
+                        return fmt_data['url'], title
                 if tier.get('url'):
-                    return tier['url']
+                    return tier['url'], title
 
     # Fallbacks in case the schema differs
     if item.get('url'):
-        return item['url']
+        return item['url'], title
     if item.get('imageUrl'):
-        return item['imageUrl']
+        return item['imageUrl'], title
 
-    return None
+    return None, title
 
 
 async def fetch_klipy_gifs(query, limit=25):
-    """Fetch GIFs matching `query` from the Klipy API (fallback provider)."""
+    """Fetch GIFs matching `query` from the Klipy API.
+    Returns a list of (url, title) tuples so results can be filtered by name."""
     if not KLIPY_API_KEY:
-        return None
+        return []
 
     url = KLIPY_SEARCH_URL_TEMPLATE.format(key=KLIPY_API_KEY)
     params = {
@@ -121,32 +124,55 @@ async def fetch_klipy_gifs(query, limit=25):
                 if response.status == 200:
                     data = await response.json()
                     items = data.get('data', {}).get('data', [])
-                    gifs = [u for u in (_extract_klipy_url(item) for item in items) if u]
-                    return gifs if gifs else None
+                    results = []
+                    for item in items:
+                        gif_url, title = _extract_klipy_url_and_title(item)
+                        if gif_url:
+                            results.append((gif_url, title))
+                    return results
                 else:
                     print(f"Klipy API returned status {response.status}")
-                    return None
+                    return []
     except Exception as e:
         print(f"Error fetching GIFs from Klipy: {e}")
-        return None
+        return []
 
 
-async def fetch_gifs(search_queries):
+async def fetch_gifs(search_queries, name_keywords=None):
     """Pick a random query from the given list and fetch GIFs from Giphy AND
-    Klipy at the same time, merging both result pools together."""
+    Klipy at the same time, merging both result pools together.
+
+    If `name_keywords` is provided, results are filtered to only keep GIFs
+    whose title actually contains one of those keywords (case-insensitive),
+    so we get GIFs of the actual person/character rather than loosely
+    related results. Falls back to the unfiltered pool if filtering finds
+    nothing (so a command never comes back completely empty)."""
     query = random.choice(search_queries)
 
-    giphy_gifs, klipy_gifs = await asyncio.gather(
+    giphy_results, klipy_results = await asyncio.gather(
         fetch_giphy_gifs(query),
         fetch_klipy_gifs(query)
     )
 
-    combined = (giphy_gifs or []) + (klipy_gifs or [])
+    combined = giphy_results + klipy_results
+
+    if name_keywords:
+        keywords_lower = [k.lower() for k in name_keywords]
+        filtered = [
+            url for url, title in combined
+            if any(k in title.lower() for k in keywords_lower)
+        ]
+        if filtered:
+            combined_urls = filtered
+        else:
+            combined_urls = [url for url, _ in combined]
+    else:
+        combined_urls = [url for url, _ in combined]
 
     # Remove duplicates while preserving order
     seen = set()
     unique_gifs = []
-    for url in combined:
+    for url in combined_urls:
         if url not in seen:
             seen.add(url)
             unique_gifs.append(url)
@@ -311,7 +337,7 @@ async def _send_gif_embed(ctx, gifs, color, fail_label):
 async def lexi(ctx):
     """Send a random Hello Kitty & Friends GIF"""
     try:
-        gifs = await fetch_gifs(HELLO_KITTY_QUERIES)
+        gifs = await fetch_gifs(HELLO_KITTY_QUERIES, name_keywords=["hello kitty"])
         await _send_gif_embed(ctx, gifs, discord.Color.pink(), "Hello Kitty & Friends")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Hello Kitty & Friends GIF: {e}")
@@ -328,7 +354,7 @@ async def lexi(ctx):
 async def beyonce(ctx):
     """Send a random Beyonce GIF"""
     try:
-        gifs = await fetch_gifs(BEYONCE_QUERIES)
+        gifs = await fetch_gifs(BEYONCE_QUERIES, name_keywords=["beyonce", "beyoncé"])
         await _send_gif_embed(ctx, gifs, discord.Color.gold(), "Beyonce")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Beyonce GIF: {e}")
@@ -351,7 +377,7 @@ async def beyonce(ctx):
 async def rihanna(ctx):
     """Send a random Rihanna GIF"""
     try:
-        gifs = await fetch_gifs(RIHANNA_QUERIES)
+        gifs = await fetch_gifs(RIHANNA_QUERIES, name_keywords=["rihanna"])
         await _send_gif_embed(ctx, gifs, discord.Color.gold(), "Rihanna")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Rihanna GIF: {e}")
@@ -376,7 +402,7 @@ async def rihanna(ctx):
 async def frankocean(ctx):
     """Send a random Frank Ocean GIF"""
     try:
-        gifs = await fetch_gifs(FRANKOCEAN_QUERIES)
+        gifs = await fetch_gifs(FRANKOCEAN_QUERIES, name_keywords=["frank ocean"])
         await _send_gif_embed(ctx, gifs, discord.Color.gold(), "Frank Ocean")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Frank Ocean GIF: {e}")
@@ -399,7 +425,7 @@ async def frankocean(ctx):
 async def future(ctx):
     """Send a random Future the rapper GIF"""
     try:
-        gifs = await fetch_gifs(FUTURE_QUERIES)
+        gifs = await fetch_gifs(FUTURE_QUERIES, name_keywords=["future"])
         await _send_gif_embed(ctx, gifs, discord.Color.gold(), "Future")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Future GIF: {e}")
@@ -420,7 +446,7 @@ async def future(ctx):
 async def manon(ctx):
     """Send a random Manon the singer GIF"""
     try:
-        gifs = await fetch_gifs(MANON_QUERIES)
+        gifs = await fetch_gifs(MANON_QUERIES, name_keywords=["manon"])
         await _send_gif_embed(ctx, gifs, discord.Color.gold(), "Manon")
     except Exception as e:
         await ctx.send(f"❌ Failed to send Manon GIF: {e}")
