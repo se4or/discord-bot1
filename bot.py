@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import random
 import aiohttp
 import pytz
+import re
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +31,122 @@ afk_users = {}  # {user_id: {'reason': 'reason', 'original_nick': 'nick'}}
 
 # Storage for user timezones
 user_timezones = {}  # {user_id: 'timezone_string'}
+
+# ==================== AI Chat Setup (Google Gemini, free tier) ====================
+
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+
+# Per-user chat history: {user_id: [("user"|"model", text), ...]}
+chat_histories = {}
+MAX_HISTORY_TURNS = 20  # keep the last 20 messages (both sides combined)
+
+CHAT_SYSTEM_PROMPT = (
+    "You are a witty, casual Discord bot chatting with a friend. Keep replies "
+    "concise (usually 1-4 sentences unless the user asks for more detail). "
+    "You can answer factual questions, give opinions, help with problems, or "
+    "just chat casually. Keep a bit of playful sass, but always give genuinely "
+    "useful and accurate answers when asked for facts or help."
+)
+
+
+async def ask_gemini(history):
+    """Send the conversation history to Gemini and return the reply text, or None on failure."""
+    if not GEMINI_API_KEY:
+        return None
+
+    contents = [{"role": role, "parts": [{"text": text}]} for role, text in history]
+
+    payload = {
+        "contents": contents,
+        "systemInstruction": {"parts": [{"text": CHAT_SYSTEM_PROMPT}]}
+    }
+    params = {"key": GEMINI_API_KEY}
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(GEMINI_API_URL, params=params, json=payload) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    try:
+                        return data['candidates'][0]['content']['parts'][0]['text']
+                    except (KeyError, IndexError):
+                        print(f"Unexpected Gemini response shape: {data}")
+                        return None
+                else:
+                    error_text = await response.text()
+                    print(f"Gemini API returned status {response.status}: {error_text}")
+                    return None
+    except Exception as e:
+        print(f"Error calling Gemini API: {e}")
+        return None
+
+
+async def handle_chat_message(message):
+    """Handle a message that's part of an ongoing chat with the bot."""
+    if not GEMINI_API_KEY:
+        await message.reply("❌ chat isn't set up yet — no GEMINI_API_KEY configured.", mention_author=False)
+        return
+
+    history = chat_histories.setdefault(message.author.id, [])
+    history.append(("user", message.content))
+    if len(history) > MAX_HISTORY_TURNS:
+        del history[:-MAX_HISTORY_TURNS]
+
+    async with message.channel.typing():
+        reply_text = await ask_gemini(history)
+
+    if reply_text:
+        history.append(("model", reply_text))
+        if len(history) > MAX_HISTORY_TURNS:
+            del history[:-MAX_HISTORY_TURNS]
+
+        # Discord messages are capped at 2000 chars, split if needed
+        chunks = [reply_text[i:i + 1900] for i in range(0, len(reply_text), 1900)] or [reply_text]
+        for i, chunk in enumerate(chunks):
+            await message.reply(chunk, mention_author=False)
+    else:
+        await message.reply("❌ couldn't get a response right now, try again in a bit.", mention_author=False)
+
+
+# Commands that are safe to auto-trigger from a chat message (no required
+# arguments beyond an optional @member), so calling them with no extra
+# parsing can't blow up. Anything needing required args (poll, announce,
+# afk reason, tictactoe opponent, cussout target) is left out on purpose —
+# those still need the real ,command syntax.
+SAFE_AUTO_COMMANDS = [
+    'lexi', 'beyonce', 'rihanna', 'frankocean', 'future', 'manon',
+    'serverinfo', 'help', 'avatar', 'banner', 'userinfo'
+]
+
+
+def detect_command_request(content):
+    """If the chat message clearly names one of the safe commands (e.g.
+    'use lexi', 'can you do the beyonce command'), return that command name."""
+    content_lower = content.lower()
+    for name in SAFE_AUTO_COMMANDS:
+        if re.search(rf'\b{name}\b', content_lower):
+            return name
+    return None
+
+
+async def try_run_requested_command(message):
+    """If the message is asking to run one of SAFE_AUTO_COMMANDS, run it and
+    return True. Otherwise return False so the caller falls back to chat."""
+    requested = detect_command_request(message.content)
+    if not requested:
+        return False
+
+    command_obj = bot.get_command(requested)
+    if not command_obj:
+        return False
+
+    ctx = await bot.get_context(message)
+    try:
+        await command_obj.callback(ctx)
+    except Exception as e:
+        await message.reply(f"❌ Couldn't run `{requested}`: {e}", mention_author=False)
+    return True
 
 # ==================== GIF Provider Setup (Giphy primary, Klipy fallback) ====================
 # Tenor's public API was deprecated by Google (cutoff June 30, 2026), so we no longer use it.
@@ -265,7 +382,8 @@ async def on_message(message):
     
     if bot.user in message.mentions and not message.reference:
         await message.reply("fuck u want")
-    
+        return
+
     for mentioned_user in message.mentions:
         if mentioned_user.id in afk_users:
             afk_data = afk_users[mentioned_user.id]
@@ -273,7 +391,23 @@ async def on_message(message):
             await message.reply(
                 f"💤 **{display_name}** is currently AFK: {afk_data['reason']}"
             )
-    
+
+    # If this message is a reply to one of the bot's own messages and isn't a
+    # command, treat it as a continuation of a chat conversation.
+    if message.reference and not message.content.startswith(','):
+        ref_msg = message.reference.resolved
+        if ref_msg is None:
+            try:
+                ref_msg = await message.channel.fetch_message(message.reference.message_id)
+            except Exception:
+                ref_msg = None
+
+        if ref_msg and ref_msg.author.id == bot.user.id:
+            handled = await try_run_requested_command(message)
+            if not handled:
+                await handle_chat_message(message)
+            return
+
     if not message.content.startswith(','):
         return
     
@@ -574,6 +708,15 @@ async def announce(ctx, channel: discord.TextChannel, *, message):
     await channel.send(embed=embed)
     await ctx.send(f"Announcement sent to {channel.mention}")
 
+@bot.command(name='forget')
+async def forget(ctx):
+    """Clear your chat history with the bot"""
+    if ctx.author.id in chat_histories:
+        del chat_histories[ctx.author.id]
+        await ctx.reply("🧹 Alright, I forgot our conversation. Clean slate.")
+    else:
+        await ctx.reply("We haven't been chatting yet, nothing to forget.")
+
 @bot.command(name='afk')
 async def afk(ctx, *, reason="AFK"):
     """Set yourself as AFK with a custom message"""
@@ -841,6 +984,16 @@ async def help_command(ctx):
         inline=False
     )
     
+    embed.add_field(
+        name="💬 Chat",
+        value=(
+            "Ping me to say hi, then reply to my message to start chatting — "
+            "ask me questions, facts, anything.\n"
+            "`,forget` - Clear our chat history and start fresh"
+        ),
+        inline=False
+    )
+
     embed.add_field(
         name="🔧 Utility",
         value=(
