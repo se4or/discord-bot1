@@ -35,7 +35,7 @@ user_timezones = {}  # {user_id: 'timezone_string'}
 # ==================== AI Chat Setup (Google Gemini, free tier) ====================
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent"
 
 # Per-user chat history: {user_id: [("user"|"model", text), ...]}
 chat_histories = {}
