@@ -35,7 +35,7 @@ user_timezones = {}  # {user_id: 'timezone_string'}
 # ==================== AI Chat Setup (Google Gemini, free tier) ====================
 
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent"
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
 
 # Per-user chat history: {user_id: [("user"|"model", text), ...]}
 chat_histories = {}
@@ -51,7 +51,9 @@ CHAT_SYSTEM_PROMPT = (
 
 
 async def ask_gemini(history):
-    """Send the conversation history to Gemini and return the reply text, or None on failure."""
+    """Send the conversation history to Gemini and return the reply text.
+    Returns None on failure, or the string '__RATE_LIMITED__' if we hit
+    Gemini's free-tier quota, so the caller can show a clearer message."""
     if not GEMINI_API_KEY:
         return None
 
@@ -73,6 +75,10 @@ async def ask_gemini(history):
                     except (KeyError, IndexError):
                         print(f"Unexpected Gemini response shape: {data}")
                         return None
+                elif response.status == 429:
+                    error_text = await response.text()
+                    print(f"Gemini API rate limited (429): {error_text}")
+                    return "__RATE_LIMITED__"
                 else:
                     error_text = await response.text()
                     print(f"Gemini API returned status {response.status}: {error_text}")
@@ -96,7 +102,12 @@ async def handle_chat_message(message):
     async with message.channel.typing():
         reply_text = await ask_gemini(history)
 
-    if reply_text:
+    if reply_text == "__RATE_LIMITED__":
+        await message.reply(
+            "⏳ hit the free chat quota for now — give it a bit and try again.",
+            mention_author=False
+        )
+    elif reply_text:
         history.append(("model", reply_text))
         if len(history) > MAX_HISTORY_TURNS:
             del history[:-MAX_HISTORY_TURNS]
