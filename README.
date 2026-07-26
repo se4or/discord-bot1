@@ -1,0 +1,34 @@
+# Discord Bot
+
+A multi-purpose Discord bot built with Python (discord.py) featuring AI chat, 
+GIF commands, utility tools, and a mini-game — built as a personal project to 
+explore Discord's API, async programming, and integrating external services.
+
+## Features
+
+- **AI Chat** — Reply to the bot's messages to start a conversation powered by 
+  Google's Gemini API, with per-user conversation history and rate-limit handling.
+- **GIF Commands** — Character/theme-based GIF commands that pull from the Giphy 
+  and Klipy APIs concurrently, merge and deduplicate results, and filter by 
+  keyword relevance.
+- **Timezone Tracking** — Slash command with autocomplete (`/set_timezone`) to 
+  save a timezone, plus a command to check your own or another member's current 
+  local time.
+- **AFK System** — Set an AFK status with a custom reason; the bot updates your 
+  nickname and notifies anyone who mentions you while you're away.
+- **Tic-Tac-Toe** — A fully interactive two-player game using Discord UI buttons, 
+  with turn tracking, win detection, and timeout handling.
+- **Server Utilities** — Server info, user info, avatar/banner lookup, polls, 
+  and channel announcements.
+
+## Tech Stack
+
+Python, discord.py, aiohttp (async HTTP requests), Google Gemini API, 
+Giphy/Klipy APIs, pytz (timezone handling), python-dotenv (environment config).
+
+## Setup
+
+1. Clone the repo and install dependencies: `pip install -r requirements.txt`
+2. Create a `.env` file with `DISCORD_TOKEN`, `GEMINI_API_KEY`, `GIPHY_API_KEY`, 
+   and `KLIPY_API_KEY`
+3. Run: `python bot.py`
